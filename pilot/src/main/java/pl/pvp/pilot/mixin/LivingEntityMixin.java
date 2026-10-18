@@ -8,7 +8,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import pl.pvp.pilot.Assistant;
 
-/** The client receives a damage event from the server (with the entity that dealt it) — assistant: whoever hits me becomes the target. */
+/** The client receives a damage event from the server (with the entity that dealt it) - assistant: whoever hits me becomes the target. */
 @Mixin(LivingEntity.class)
 public class LivingEntityMixin {
 	@Inject(method = "handleDamageEvent", at = @At("HEAD"))

@@ -1,19 +1,10 @@
-"""PPO training with self-play on real Minecraft servers (pvpmost mod), in parallel.
+"""PPO self-play training on real Minecraft servers.
 
-Every server has its own collector thread: it drives the bots with a CPU copy of the network and puts batches of ticks
-into a queue. The main thread trains the network on the GPU batch by batch. Collection and learning run at the same time,
-so a batch may have been collected by a network one update older — PPO handles this because it computes ratios against
-the probabilities from collection time.
-
-Arenas on every server have roles:
-  self — both sides are the current network, both learn,
-  pula — the network vs one of its older versions from the pool (only the current one learns),
-  bot  — the network vs the hand-written bot v2 (bots.py); a progress gauge: wins, losses, draws.
-Round rules and rewards: features.Sedzia. The file training/PAUZA (created by the show during /walcz) pauses learning.
+One collector thread per server drives the bots with a CPU copy of the network and queues batches of ticks; the main
+thread learns on the GPU. Arena roles per server: self-play, pool (vs an older version), bot (vs bot v2, a fixed
+yardstick), and optionally 1v3 vs bot v2 or pvp-bot. Rules and rewards: features.Sedzia. The file PAUZA pauses learning.
 
   python train.py --nazwa pvp2 --wznow --porty 25599,25602
-
-Output in runs/<nazwa>/: log.csv, siec.pt (full checkpoint), siec_pokaz.pt (light copy), pula/.
 """
 import argparse
 import csv
@@ -49,11 +40,9 @@ PRZEDM = ["strzaly", "traf_strzala", "blokady", "zjedzone", "haki", "bloki_post"
 
 @torch.no_grad()
 def ozyw_neurony(siec, opt, X, prog=0.01):
-    """ReDo (Sokar et al. 2023): neurons in the blocks that barely fire on fresh fights
-    (mean activity < prog * layer mean) get new input weights and ZERO output weights.
-    At the moment of revival the network computes practically the same as before (almost-dead neurons lose their
-    negligible contribution; measured: logits change by ~0.04); learning decides what to use them for.
-    Also zeroes the Adam state for these weights. -> list: how many were revived in each block"""
+    """ReDo (Sokar et al. 2023): block neurons that barely fire on fresh data get new input weights and zero output
+    weights, so the network's output barely changes. Also resets their Adam state. Returns revived counts per block.
+    """
     ile = []
     h = F.relu(siec.wejscie(siec.norm(X)))
     for b in siec.bloki:
@@ -84,7 +73,7 @@ def zapisz_atomowo(obiekt, sciezka):
 
 
 def wagi_fp16(siec):
-    # scalars (e.g. the normalization counter, ~1e8) stay in fp32 — in fp16 they would overflow to inf
+    # scalars (e.g. the normalization counter, ~1e8) stay in fp32 - in fp16 they would overflow to inf
     return {k: (v.half() if v.is_floating_point() and v.dim() > 0 else v).cpu() for k, v in siec.state_dict().items()}
 
 
@@ -117,7 +106,7 @@ class Zbieracz(threading.Thread):
                 self.petla()
             except Exception as e:                     # server hung / connection dropped: retry, do not kill training
                 bledy += 1
-                print(f"collector {self.nr} (port {self.port}): {e!r} — retrying in 30 s (error #{bledy})", flush=True)
+                print(f"collector {self.nr} (port {self.port}): {e!r} - retrying in 30 s (error #{bledy})", flush=True)
                 if bledy >= 20:                        # something is permanently broken: report to the main thread
                     self.blad = e
                     self.kolejka.put(None)
@@ -213,8 +202,8 @@ class Zbieracz(threading.Thread):
                 idx_bota = bot(obs, sedzia.cel)
                 idx[steruje_bot] = idx_bota[steruje_bot]
                 nad = np.zeros(n, bool)
-                if naucz is not None:                      # the teacher takes over pitch, slot and right button
-                    idx_n = naucz(obs, sedzia.prawy, sedzia.cel)   # when it wants to use an item; these ticks = lessons, not PPO
+                if naucz is not None:                      # the teacher takes over pitch, slot and right button when it wants to use an item;
+                    idx_n = naucz(obs, sedzia.prawy, sedzia.cel)   # those ticks become lessons, not PPO samples
                     nad = m_naucz & (naucz.tryb > 0) & ~sedzia.smiec[u.klatka]
                     if nad.any():
                         w_ = np.where(nad)[0]
@@ -239,7 +228,7 @@ class Zbieracz(threading.Thread):
                 st["bw"] += int((kb & (w0 > 0)).sum())
                 st["bp"] += int((kb & (w0 < 0)).sum())
                 st["br"] += int((kb & w["remis"]).sum())
-                if z_puli:                                 # network (player 0 of the arena) vs an older version from the pool
+                if z_puli:
                     kp = kon & k_pula
                     st["pw"] += int((kp & (w0 > 0)).sum())
                     st["pp"] += int((kp & (w0 < 0)).sum())
@@ -324,7 +313,7 @@ def main():
     a.add_argument("--kara_remis", type=float, default=0.5, help="draw penalty for both sides (0.8 from stage 3 on)")
     a.add_argument("--co_ile_archiwum", type=int, default=200, help="permanent weight archive every N updates")
     a.add_argument("--przedmioty", action="store_true", help="stage 5: bow, food, shield, fishing rod, blocks (ZESTAWY_ETAP5)")
-    a.add_argument("--lag", action="store_true", help="\"fair network\" stage: ping 0–200 ms (features.Lag)")
+    a.add_argument("--lag", action="store_true", help="\"fair network\" stage: ping 0-200 ms (features.Lag)")
     a.add_argument("--etap6", action="store_true", help="stage 6: terrain, lava, potions (ZESTAWY_ETAP6)")
     a.add_argument("--multi", type=int, default=0, help="number of 1v3 arenas per server (at the end of the arena list)")
     a.add_argument("--multi_pvpbot", type=int, default=0, help="how many of the 1v3 arenas have pvp-bot enemies (the rest: bot v2)")
@@ -431,7 +420,7 @@ def main():
                 gm = np.zeros((len(x), len(GLOWY)), bool)
                 gm[:, gl] = True
                 gs.append(gm)
-                # lessons validated by measurement (potion throws from range: +9 pts for the teacher) weigh more
+                # throw lessons (validated: +9 pts for the teacher) can be weighted up
                 ws.append(np.full(len(x), args.waga_rzut if f.name.startswith("lekcje6_rzut") else 1.0, np.float32))
             except Exception as e:                         # file being written or corrupted: skip
                 print(f"lessons: skipping {f.name} ({e})", flush=True)
@@ -515,9 +504,9 @@ def main():
                     xr = Xt[i]
                     w_rece = (xr[:, KOL_W_RECE] + xr[:, KOL_W_RECE + 2] + xr[:, KOL_W_RECE + 3]) > 0.5
                     loss = loss - args.zacheta_prawy * (ent_g[:, 8] * w_rece).mean()
-                if jest_czlowiek:                          # "sometimes do as the demonstrator" — small weight, so its weaknesses are not adopted
+                if jest_czlowiek:                          # small weight, so the demonstrator's weaknesses are not copied
                     ic = torch.randint(0, len(Xc), (args.batch_czlowieka,), device=dev)
-                    # lessons only for selected decisions (e.g. slot and right button) — the head mask depends on the file
+                    # lessons only for selected decisions (e.g. slot and right button) - the head mask depends on the file
                     czesci = torch.split(siec(Xc[ic])[0], GLOWY, dim=-1)
                     logp_c = sum(F.log_softmax(czesci[g].float(), -1).gather(-1, Ac[ic][:, g:g + 1]).squeeze(-1) * Gc[ic][:, g]
                                  for g in range(len(GLOWY)))

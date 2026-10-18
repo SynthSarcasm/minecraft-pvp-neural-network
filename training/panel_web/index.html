@@ -190,8 +190,8 @@
     <div class="prawo">
       <span class="chip" id="c-zywo"><span class="dot"></span>live</span>
       <span class="chip" id="c-trening"><span class="dot"></span>training</span>
-      <span class="chip">version <b id="c-wersja">—</b></span>
-      <span class="chip"><b id="c-kroki">—</b> steps</span>
+      <span class="chip">version <b id="c-wersja">-</b></span>
+      <span class="chip"><b id="c-kroki">-</b> steps</span>
       <span class="chip tv" id="c-tv" title="automatic scene switching (key T)">TV ▶</span>
     </div>
   </header>
@@ -208,14 +208,14 @@
           <div class="imie"><span>NET A</span><span class="ikony" id="ik-a"></span></div>
           <div class="serca" id="serca-a"></div>
           <div class="pasek-ataku" id="atak-a"><i></i></div>
-          <div class="ping" id="ping-a">—</div>
+          <div class="ping" id="ping-a">-</div>
         </div>
         <div class="zegar"><div class="czas" id="zegar">60</div><div class="wynik"><b class="a" id="ko-a">0</b> : <b class="b" id="ko-b">0</b></div></div>
         <div class="zawodnik b">
           <div class="imie"><span>NET B</span><span class="ikony" id="ik-b"></span></div>
           <div class="serca" id="serca-b"></div>
           <div class="pasek-ataku" id="atak-b"><i></i></div>
-          <div class="ping" id="ping-b">—</div>
+          <div class="ping" id="ping-b">-</div>
         </div>
       </div>
       <canvas id="arena" width="540" height="540" style="width:540px;height:540px"></canvas>
@@ -225,7 +225,7 @@
         <h2>Who is winning</h2>
         <p class="opis">Both networks' own value estimates, live.</p>
         <div class="liny"><i class="la" id="lina-a"></i><i class="lb"></i></div>
-        <div class="liny-podpis"><span style="color:var(--a)" id="lv-a">—</span><span style="color:var(--b)" id="lv-b">—</span></div>
+        <div class="liny-podpis"><span style="color:var(--a)" id="lv-a">-</span><span style="color:var(--b)" id="lv-b">-</span></div>
       </div>
       <div class="karta" style="flex:1;display:flex;flex-direction:column;min-height:0">
         <h2>Play-by-play</h2>
@@ -236,7 +236,7 @@
         <div class="bilans">
           <span>Arena 1 · net A : net B (knockouts)</span><b id="bil-1">0 : 0</b>
           <span>Arena 2 · net : bot v2 without ping</span><b id="bil-2">0 : 0</b>
-          <span>Mean damage per hit</span><b id="bil-dmg">—</b>
+          <span>Mean damage per hit</span><b id="bil-dmg">-</b>
         </div>
       </div>
     </div>
@@ -247,16 +247,16 @@
     <div class="karta gora">
       <h2>Road to mastery</h2>
       <div class="osiagniecia" id="osiagniecia"></div>
-      <div class="xp"><span class="poz" id="xp-poz">0/6</span><div class="tor" id="xp-tor"></div><span class="tekst" id="xp-tekst">—</span></div>
+      <div class="xp"><span class="poz" id="xp-poz">0/6</span><div class="tor" id="xp-tor"></div><span class="tekst" id="xp-tekst">-</span></div>
       <div class="droga" id="droga"></div>
     </div>
     <div class="srodkowy">
       <div class="karta">
         <div class="naglowek"><div><h2>Form</h2>
         <p class="opis">% of rounds won (thick line smoothed). Vs older versions &gt; 50% = the network has outgrown them.</p></div>
-        <div class="liczby"><div><div class="w" style="color:var(--a)" id="f-pula">—</div><div class="e">vs older</div></div>
-          <div><div class="w" style="color:var(--b)" id="f-bot">—</div><div class="e">vs bot v2</div></div>
-          <div><div class="w" id="f-ko">—</div><div class="e">knockouts</div></div></div></div>
+        <div class="liczby"><div><div class="w" style="color:var(--a)" id="f-pula">-</div><div class="e">vs older</div></div>
+          <div><div class="w" style="color:var(--b)" id="f-bot">-</div><div class="e">vs bot v2</div></div>
+          <div><div class="w" id="f-ko">-</div><div class="e">knockouts</div></div></div></div>
         <div class="wykres"><canvas id="w-forma"></canvas></div>
       </div>
       <div class="karta">
@@ -280,8 +280,8 @@
       <p class="opis">2048 neurons of the last layer (averaged down to 256). Brighter = more active.</p>
       <div class="plotno-box" id="mozg-box"><canvas id="mozg"></canvas></div>
       <div class="wartosci">
-        <div class="karta-mini">dead neurons (block 2 / 3)<b id="mz-martwe">—</b></div>
-        <div class="karta-mini">decisiveness (entropy)<b id="mz-ent">—</b></div>
+        <div class="karta-mini">dead neurons (block 2 / 3)<b id="mz-martwe">-</b></div>
+        <div class="karta-mini">decisiveness (entropy)<b id="mz-ent">-</b></div>
       </div>
     </div>
     <div class="karta">
@@ -314,7 +314,7 @@
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const K = { a: css('--a'), b: css('--b'), s3: css('--s3'), tekst: css('--tekst'), tekst2: css('--tekst-2'), tekst3: css('--tekst-3'),
   siatka: css('--siatka'), os: css('--os'), karta: css('--karta'), dobre: css('--dobre'), zle: css('--zle'), zloto: css('--zloto'), xp: css('--xp') };
-const fmt = (v, d = 0) => v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const fmt = (v, d = 0) => v == null ? '-' : v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 const $ = id => document.getElementById(id);
 let SKALA = 1;
 function dopasuj() {
@@ -453,7 +453,7 @@ function wygladz(v, okno = 7) {                          // moving average (skip
 }
 const wEgz = liniowy('w-egz', [
   { label: 'fists', borderColor: K.a, backgroundColor: K.a, pointRadius: 3.5 },
-  { label: 'progress (vs −500)', borderColor: K.b, backgroundColor: K.b, pointRadius: 3.5 },
+  { label: 'progress (vs -500)', borderColor: K.b, backgroundColor: K.b, pointRadius: 3.5 },
   { label: 'stage gain', borderColor: K.s3, backgroundColor: K.s3, pointRadius: 3.5 },
   linia50], { scales: { x: osX('version'), y: osY(true, { min: 20, max: 90 }) } });
 const wRundy = new Chart($('w-rundy'), { type: 'bar',
@@ -498,9 +498,9 @@ async function odswiezLog() {
     ustaw(wEkw, akt, [p.map(x => x.traf_strzala), p.map(x => x.blokady), p.map(x => x.zjedzone), p.map(x => x.haki),
                       p.map(x => x.bloki_post == null ? null : x.bloki_post / 10)].map(v => wygladz(v, 5)));
     ustaw(wEnt, akt, [p.map(x => x.ent)]);
-    $('f-pula').textContent = t.pula == null ? '—' : fmt(t.pula) + '%';
-    $('f-bot').textContent = t.bot == null ? '—' : fmt(t.bot) + '%';
-    $('f-ko').textContent = t.nokaut == null ? '—' : fmt(t.nokaut) + '%';
+    $('f-pula').textContent = t.pula == null ? '-' : fmt(t.pula) + '%';
+    $('f-bot').textContent = t.bot == null ? '-' : fmt(t.bot) + '%';
+    $('f-ko').textContent = t.nokaut == null ? '-' : fmt(t.nokaut) + '%';
     $('c-wersja').textContent = '#' + fmt(t.akt);
     $('c-kroki').textContent = fmt(t.kroki / 1e6, 1) + ' M';
     $('mz-ent').textContent = fmt(p[p.length - 1].ent, 2);
@@ -625,7 +625,7 @@ function ikonyBroni(id, p) {
   if (p[31] & 4) el.appendChild(ikona('tarcza', 2));
 }
 // crit from the damage value: weapon damage (fist 1, sword 7, axe 9), crit ×1.5, full diamond armor
-// (20 pts, toughness 8): damage × (1 − min(20, max(4, 20 − d/4)) / 25); threshold halfway between a normal hit and a crit
+// (20 pts, toughness 8): damage × (1 - min(20, max(4, 20 - d/4)) / 25); threshold halfway between a normal hit and a crit
 const SILA = [1, 7, 9];
 const poZbroi = (d, zb) => zb ? d * (1 - Math.min(20, Math.max(4, 20 - d / 4)) / 25) : d;
 function czyKrytyk(dmg, bron, zb) {
@@ -652,8 +652,8 @@ function analizuj(s) {
     if (hp < prev - 0.05 && hp > 1.05 && i < 2) {
       const dmg = prev - hp, kryt = czyKrytyk(dmg, g[ktos][12], g[i][12] > 0);
       stanRundy.dmg[ktos] += dmg; stanRundy.traf++; stanRundy.sumaTraf += dmg;
-      efekty.push({ x: g[i][0], z: g[i][2], tekst: '−' + fmt(dmg, 1), kryt, t: performance.now(), kol: ktos ? K.b : K.a });
-      if (kryt) zdarzenie(`${NAZ[ktos]} <span class="kryt">CRIT!</span> ${BRON[g[ktos][12]]} −${fmt(dmg, 1)}`, ktos ? 'b' : 'a');
+      efekty.push({ x: g[i][0], z: g[i][2], tekst: '-' + fmt(dmg, 1), kryt, t: performance.now(), kol: ktos ? K.b : K.a });
+      if (kryt) zdarzenie(`${NAZ[ktos]} <span class="kryt">CRIT!</span> ${BRON[g[ktos][12]]} -${fmt(dmg, 1)}`, ktos ? 'b' : 'a');
     }
     if (hp <= 1.05 && prev > 1.05) {
       if (i < 2) { stanRundy.bil1[ktos]++; efekty.push({ x: g[i][0], z: g[i][2], tekst: 'K.O.', ko: true, t: performance.now(), kol: K.zloto });
@@ -771,10 +771,10 @@ function zbudujReke(id, kto) {
       <div class="klawisz pusty"></div><div class="klawisz" data-k="w">W<small>forward</small></div><div class="klawisz pusty"></div><div class="klawisz" data-k="lpm">LMB<small>attack</small></div>
       <div class="klawisz" data-k="a">A<small>left</small></div><div class="klawisz" data-k="s">S<small>back</small></div><div class="klawisz" data-k="d">D<small>right</small></div><div class="klawisz" data-k="shift">⇧<small>sneak</small></div>
       <div class="klawisz szeroki" data-k="ctrl">CTRL<small>sprint</small></div><div class="klawisz szeroki" data-k="spacja">SPACE<small>jump</small></div>
-      <div class="klawisz szeroki" data-k="ppm">RMB<small>bow · shield · eat</small></div><div class="klawisz szeroki" data-k="slot">1–9<small>switch item</small></div>
+      <div class="klawisz szeroki" data-k="ppm">RMB<small>bow · shield · eat</small></div><div class="klawisz szeroki" data-k="slot">1-9<small>switch item</small></div>
     </div>
     <div class="mysz"><div><div class="opis">Mouse: horizontal turn</div><canvas class="wachlarz" width="180" height="50" style="width:180px;height:50px"></canvas></div>
-      <div style="text-align:center"><div class="opis">certainty</div><div class="pewnosc" style="font-family:var(--pix);font-size:22px">—</div></div></div>`;
+      <div style="text-align:center"><div class="opis">certainty</div><div class="pewnosc" style="font-family:var(--pix);font-size:22px">-</div></div></div>`;
   el.dataset.kol = kol;
 }
 zbudujReke('reka-a', 0); zbudujReke('reka-b', 1);

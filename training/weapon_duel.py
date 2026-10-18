@@ -1,4 +1,4 @@
-"""Weapon tournament: the current network with a sword vs the same network with an axe (both sample moves as in training).
+"""The current network with a sword vs the same network with an axe.
 
   python weapon_duel.py --nazwa pvp3 --port 25603 --sekundy 180
 """

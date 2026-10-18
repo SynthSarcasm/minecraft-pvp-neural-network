@@ -1,17 +1,10 @@
-"""Tournament: our network vs third-party opponents from GitHub (code in ../third_party/).
+"""Our network (even players, siec_pokaz.pt) vs third-party opponents (odd players): FlyPvP, the pvp-bot-fabric
+port, or our bot v2. Our side plays with ping; the opponent without, unless --obcy_lag.
 
-  python tournament.py --przeciwnik fly --sekundy 600        # FlyPvP (fly-connectome network, NuelNexus/flypvp)
-  python tournament.py --przeciwnik v2  --sekundy 120        # reference: our rule-based bot v2
-  python tournament.py --przeciwnik pvpbot --sekundy 200 --bronie 2,2 --maska 31   # pvp-bot-fabric (port in ../third_party/pvpbot26)
+  python tournament.py --przeciwnik pvpbot --sekundy 200 --bronie 2,2 --maska 31
+  python tournament.py --przeciwnik fly --sekundy 600      # needs FlyPvP in ../third_party/flypvp
 
-Even players = our network (siec_pokaz.pt), odd players = the opponent. Default: sword vs sword, no items
-(FlyPvP's domain: trained with a sword only). Our network plays with 0–200 ms ping as in training, the opponent WITHOUT
-ping (an advantage for the opponent). --obcy_lag gives the opponent the same ping (it sees the target delayed, actions
-arrive later, hits are decided by the "client"), --bez_lagu disables ping for everyone.
-
-FlyPvP gets exactly the sense vector its own simulator produced (we load the numbers from our server into one fight
-of its simulator and ask for senses(0), like its pvp/live.py does); walls get the real distance
-(our original arena was 15 blocks wide, its arena 24). Pitch aims at the chest, like its "motor layer".
+FlyPvP gets the sense vector of its own simulator, rebuilt from our observations (as its pvp/live.py does).
 """
 import argparse
 import json
@@ -49,7 +42,7 @@ class FlyPvP:
         self.model.load_state_dict(blob["state"])
         self.model.eval()
         self.W = self.model.weight_matrix().detach()
-        self.gracze = gracze                          # indices of the players it controls
+        self.gracze = gracze
         k = len(gracze)
         self.duel = sim.Duel(k, 0)
         self.hidden = self.model.initial(k)
@@ -109,8 +102,8 @@ class FlyPvP:
         out = np.zeros((k, 10), np.float32)
         out[:, 0] = np.array(sim.FORWARD, np.float32)[a[:, 0]]
         out[:, 1] = np.array(sim.STRAFE, np.float32)[a[:, 1]]         # +1 = left, same as ours (Carpet)
-        out[:, 3] = a[:, 2]                                            # sprint
-        out[:, 2] = a[:, 3]                                            # jump
+        out[:, 3] = a[:, 2]
+        out[:, 2] = a[:, 3]
         out[:, 4] = a[:, 4]                                            # attack (the server computes the crosshair)
         out[:, 5] = np.array(sim.TURNS, np.float32)[a[:, 5]]
         poziom = np.hypot(on[:, M.X] - ja[:, M.X], on[:, M.Z] - ja[:, M.Z])
@@ -136,7 +129,7 @@ class V2:
 
 class Rcon:
     """Server console (RCON, 127.0.0.1 only). Commands go from a separate thread: the server runs them between ticks,
-    and in lockstep mode a tick waits for our actions — waiting for the reply in the main loop would deadlock both."""
+    and in lockstep mode a tick waits for our actions - waiting for the reply in the main loop would deadlock both."""
 
     def __init__(self, port, haslo):
         self.s = socket.create_connection(("127.0.0.1", port))
@@ -179,11 +172,10 @@ class Rcon:
 
 
 class PvpBot:
-    """Stepan1411/pvp-bot-fabric v0.0.15 ported to 26.3 (../third_party/pvpbot26, jar in the server's mods).
-    Drives the given players server-side; Python sends NaN for them (the pvpmost mod then leaves them alone).
-    Settings: the author's defaults (0% misses and mistakes, crits, shield, shield breaking, food, potions) except
-    ranged-retreat, and no target picking of its own (target = our player, ordered after every arena reset).
-    cele(): [n] target index of every player (e.g. Sedzia.cel); default: pair partner i ^ 1."""
+    """pvp-bot-fabric (port in ../third_party/pvpbot26) driving the given players server-side over RCON.
+    Python sends NaN actions for them. Settings are the author's defaults except ranged-retreat and target picking;
+    the target is ordered after every arena reset. cele() returns each player's target index.
+    """
 
     def __init__(self, n, gracze, port_rcon=25577, haslo_z=None, cele=None):
         haslo = Path(haslo_z or KAT.parent / "server3" / "rcon_haslo.txt").read_text().strip()
@@ -191,8 +183,7 @@ class PvpBot:
         self.cele = cele or (lambda: np.arange(n) ^ 1)
         for k, v in [("bot-leave-on-death", "false"), ("clear-on-remove", "false"), ("auto-mend", "false"),
                      ("idle", "false"), ("drop-armor", "false"), ("drop-weapon", "false"),
-                     # the default "with a bow, back off to range" blocks melee forever in a small arena
-                     # (archer mode at every distance, 0 damage) — disabled: melee up close, bow from afar
+                     # the default ranged-retreat makes it back off with a bow forever in a small arena (0 damage)
                      ("ranged-retreat", "false"),
                      # 1v3: enemies do not pick targets themselves and do not take revenge on each other (stray lava/arrow)
                      ("auto-target", "false"), ("revenge", "false"), ("target-bots", "false"), ("friendly-fire", "false")]:
@@ -204,7 +195,7 @@ class PvpBot:
 
     def nowa_walka(self, maska_graczy):
         c = self.cele()
-        for i in self.gracze[maska_graczy[self.gracze]]:          # re-target after an arena reset
+        for i in self.gracze[maska_graczy[self.gracze]]:
             self.rcon.komenda(f"pvpbot bot-management attack bot{i:03d} bot{c[i]:03d}")
 
     def __call__(self, obs, t_ep, widziany=None):

@@ -1,8 +1,4 @@
-"""Do crits (jump + hit while falling) pay off in a fist fight?
-
-Tournament bot v2 vs bot v2 — player A always goes for crits, player B never (sprint + W-tap).
-The rest of the style (accuracy, strafe, distance) is drawn as usual. Counts wins and the damage distribution of single
-hits (1.0 = normal hit, 1.5 = crit), to check that crits work for fake players at all.
+"""Bot v2 vs bot v2 where player A always goes for crits and B never; prints win rates and hit damages.
 
   python test_crits.py --port 25603 --sekundy 120
 """

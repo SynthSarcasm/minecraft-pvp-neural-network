@@ -1,12 +1,8 @@
-"""Hand-written PvP bot "v2" — a teacher for imitation and a fair sparring partner.
+"""Rule-based bots. BotV2 is the imitation teacher and the fixed yardstick; it picks actions from the same
+discrete steps as the network (features.RUCH / YAW_PROGI / PITCH_PROGI), so it can be imitated 1:1.
 
-Plays like a decent player: aims smoothly at the torso, keeps attack distance, strafes, attacks only with a full
-attack-strength bar, does a W-tap after a hit (releases sprint for 2 ticks so the next hit knocks back again),
-and in "crits" mode jumps and hits while falling (a crit needs: airborne, falling, not sprinting).
-The style is drawn every round (mode, strafe, accuracy, bar threshold, distance) so the network does not copy a single pattern.
-
-It picks actions from the same discrete steps as the network (features.RUCH / YAW_PROGI / PITCH_PROGI), so its moves
-can be imitated 1:1. Returns indices [n, 7] like the network.
+BotV2 aims at the torso, keeps attack distance, strafes, attacks with a full bar, W-taps, and in half of the rounds
+goes for crits. Its style is drawn every round.
 """
 import numpy as np
 from features import PITCH_PROGI, YAW_PROGI
@@ -60,16 +56,14 @@ class BotV2:
         blad_pitch = chce_pitch - ja[:, PITCH] + r.normal(0, 1, n) * self.szum * 0.5
 
         blisko = odl < 4.0
-        # distance: close in, hold range, back off when too close
         przod = np.where(odl > self.dystans + 0.4, 1.0, np.where(odl < self.dystans - 0.8, -1.0, 1.0))
         sprint = (przod > 0) & ~(self.krytyki & blisko)               # a crit does not work while sprinting
-        # strafe within range, direction changes every 15-40 ticks
         self.zmiana_za -= 1
         zmien = self.zmiana_za <= 0
         self.kierunek[zmien] *= -1
         self.zmiana_za[zmien] = r.integers(15, 40, int(zmien.sum()))
         bok = np.where(blisko & self.strafe_wl, self.kierunek, 0.0)
-        # (stage 6) lava right ahead: do not step in, move sideways
+        # lava right ahead: sidestep
         from bridge import MAPA_L
         lawa_przed = ja[:, MAPA_L + 4 * 7 + 3] + ja[:, MAPA_L + 5 * 7 + 3] + ja[:, MAPA_L + 4 * 7 + 2] + ja[:, MAPA_L + 4 * 7 + 4] > 0.5
         przod = np.where(lawa_przed & (przod > 0), 0.0, przod)
@@ -89,33 +83,24 @@ class BotV2:
         cios = celuje & naladowany & np.where(self.krytyki, spada | (odl < 2.0), True)
         self.wtap[cios & ~self.krytyki] = 2
 
-        idx = np.zeros((n, 9), np.int64)                               # heads 7–8 (slot, right button): no change
+        idx = np.zeros((n, 9), np.int64)
         idx[:, 0] = (przod.astype(np.int64) + 1) * 3 + (bok.astype(np.int64) + 1)
         idx[:, 1] = skok
         idx[:, 2] = sprint
         idx[:, 3] = cios
-        idx[:, 4] = 0                                                   # no sneaking
+        idx[:, 4] = 0
         idx[:, 5] = _najblizszy(YAW_PROGI, np.clip(blad_yaw, -45, 45))
         idx[:, 6] = _najblizszy(PITCH_PROGI, np.clip(blad_pitch, -20, 20))
         return idx
 
 
 class BotPrzedmioty:
-    """Item teacher (stage 5): fights like bot v2 and additionally uses its inventory like a sensible player.
+    """Item teacher: fights like BotV2 and uses items like a sensible player (eat when low and far, bow beyond
+    5.5 blocks, shield against a charged attack, lava at the opponent's feet from 1.8-4 blocks, healing below 9 HP,
+    offensive potions at the opponent's feet from 4+ blocks, buff potions away from the opponent).
 
-    - food: HP < 10 and opponent farther than 4 blocks -> backs off (if it has blocks — first places a block
-      towards the opponent), takes out a golden apple (or a steak when hungry) and holds right-click to eat;
-    - bow: opponent farther than 5.5 blocks -> bow, draws >= 20 ticks while aiming, releases;
-    - fishing rod: opponent 3.5–7 blocks away -> casts, reels in after hooking or 15 ticks and goes back to the weapon;
-    - shield: opponent in range with a charged attack, looking at me, while my bar is not ready -> blocks;
-    - (stage 6) lava: opponent 1.8–4 blocks away -> bucket, aims at its feet, pours and goes back to the weapon;
-    - healing: HP < 9 -> healing potion, looks down at its feet, throws;
-    - potion from slot 8: drinkable (strength, speed, fire resistance — when burning, regeneration at HP < 14) away from
-      the opponent; splash on itself (strength, speed) at its feet; splash on the enemy (harming, poison, slowness,
-      weakness) at the enemy's feet from 2–6 blocks;
-    - otherwise: weapon in hand (slot 0), right button released.
-    Returns indices [n, 9] like the network (slot: 0 no change / k+1 = slot k; right: 0 as is / 1 press / 2 release).
-    `prawy` = current button state (Sedzia.prawy). `tryb` (for statistics): 0 fight, 1 bow, 2 food, 3 rod, 4 shield, 5 block.
+    Returns indices [n, 9] like the network. `prawy` is the current right-button state (Sedzia.prawy); `tryb` is the
+    current mode, for statistics.
     """
 
     UMIEJETNOSCI = ("jedzenie", "luk", "wedka", "tarcza", "bloki", "lawa", "leczenie", "mikstura")
@@ -123,12 +108,12 @@ class BotPrzedmioty:
     def __init__(self, n, rng=None, umie=UMIEJETNOSCI, tylko_rzucane=False):
         self.n = n
         self.umie = set(umie)
-        self.tylko_rzucane = tylko_rzucane            # no drinking (with ping, drinking got interrupted — bad lessons)
+        self.tylko_rzucane = tylko_rzucane            # drinking gets interrupted under ping and made bad lessons
         self.rng = rng or np.random.default_rng()
         self.v2 = BotV2(n, self.rng)
         self.tryb = np.zeros(n, np.int64)
         self.licz = np.zeros(n, np.int64)
-        self.przerwa = np.zeros(n, np.int64)          # pause between fishing rod casts
+        self.przerwa = np.zeros(n, np.int64)
 
     def nowa_walka(self, maska):
         self.v2.nowa_walka(maska)
@@ -172,14 +157,13 @@ class BotPrzedmioty:
             if self.tylko_rzucane and rodzaj < 5:
                 rodzaj = 0
             poziom = np.hypot(on[MX] - ja[MX], on[MZ] - ja[MZ]) + 1e-6
-            pitch_stopy = -np.degrees(np.arctan2(on[MY] - (ja[MY] + 1.62), poziom))   # at the opponent's feet
+            pitch_stopy = -np.degrees(np.arctan2(on[MY] - (ja[MY] + 1.62), poziom))
 
             def patrz(cel_pitch):
                 idx[i, 6] = _najblizszy(PITCH_PROGI, np.clip([cel_pitch - ja[PI]], -20, 20))[0]
                 return abs(cel_pitch - ja[PI]) < 6
             ma_jedzenie = (m & 2) and (ja[JABLKA] > 0 or (ja[STEKI] > 0 and ja[JEDZENIE] < 20))
             t = self.tryb[i]
-            # --- mode choice (only from fighting; modes end by themselves)
             if t == 0:
                 if (m & 64) and ja[LECZENIE] > 0 and (ja[HP] < 5 or ja[HP] < 10 and odl > 3.5) and self.przerwa[i] == 0:
                     t = 7
@@ -200,7 +184,7 @@ class BotPrzedmioty:
                     self.licz[i] = 0
             self.licz[i] += 1
             k = self.licz[i]
-            if t == 6:                                   # lava under the opponent's feet
+            if t == 6:
                 wybierz(6)
                 idx[i, 3] = 0
                 gotowy = patrz(pitch_stopy + 4)
@@ -208,10 +192,10 @@ class BotPrzedmioty:
                     wcisnij()
                 if ja[WIADRO] != 1 or k > 12 or odl > 4.8:
                     pusc()
-                    t = 10 if ja[WIADRO] != 1 else 0     # after pouring: step back so as not to walk into the lava
-            elif t == 10:                                # step back from the lava
+                    t = 10 if ja[WIADRO] != 1 else 0     # step away so we do not walk into our own lava
+            elif t == 10:
                 wybierz(0)
-                idx[i, 0] = 0 * 3 + 1                    # backwards
+                idx[i, 0] = 0 * 3 + 1
                 idx[i, 2] = 0
                 if k > 12:
                     t = 0
@@ -230,17 +214,17 @@ class BotPrzedmioty:
                 if k > 14:
                     pusc()
                     t = 0
-            elif t == 8:                                 # drinking (strength, speed, fire resistance, regeneration)
+            elif t == 8:
                 wybierz(8)
                 idx[i, 3] = 0
-                idx[i, 0] = 0 * 3 + 1                    # backwards
+                idx[i, 0] = 0 * 3 + 1
                 idx[i, 2] = 0
                 if slot == 8:
                     wcisnij()
                 if k > 40 or ja[MIKSTURA_ILE] <= 0 or (k > 6 and ja[UZYWA] < 0.5 and wcisniety) or odl < 2.0:
                     pusc()
                     t = 0
-            elif t == 9:                                 # splash potion at the opponent
+            elif t == 9:
                 wybierz(8)
                 idx[i, 3] = 0
                 gotowy = patrz(pitch_stopy)
@@ -253,9 +237,9 @@ class BotPrzedmioty:
                 if k > 12 or ja[MIKSTURA_ILE] <= 0:
                     pusc()
                     t = 0
-            elif t == 5:                                 # block between us, then eat
+            elif t == 5:
                 wybierz(5)
-                idx[i, 0] = 1 * 3 + 1                    # stand still
+                idx[i, 0] = 1 * 3 + 1
                 idx[i, 3] = 0
                 idx[i, 6] = _najblizszy(PITCH_PROGI, np.clip([55.0 - ja[PITCH]], -20, 20))[0]
                 if slot == 5 and abs(55.0 - ja[PITCH]) < 8 and k > 3:
@@ -266,10 +250,10 @@ class BotPrzedmioty:
                 if k > 14:
                     pusc()
                     t, self.licz[i] = 2, 0
-            elif t == 2:                                 # eat away from the opponent
+            elif t == 2:
                 s = 2 if ja[JABLKA] > 0 else 3
                 wybierz(s)
-                idx[i, 0] = 0 * 3 + 1                    # backwards
+                idx[i, 0] = 0 * 3 + 1
                 idx[i, 2] = 0
                 idx[i, 3] = 0
                 if slot == s:
@@ -277,9 +261,9 @@ class BotPrzedmioty:
                 if k > 45 or (k > 6 and ja[UZYWA] < 0.5 and wcisniety) or odl < 2.5:
                     pusc()
                     t = 0
-            elif t == 1:                                 # bow
+            elif t == 1:
                 wybierz(1)
-                idx[i, 0] = 1 * 3 + 1 + (1 if self.v2.kierunek[i] > 0 else -1)   # strafe in place
+                idx[i, 0] = 1 * 3 + 1 + (1 if self.v2.kierunek[i] > 0 else -1)
                 idx[i, 2] = 0
                 idx[i, 3] = 0
                 if slot == 1:
@@ -290,7 +274,7 @@ class BotPrzedmioty:
                 if (ja[BRON] > 0 and odl < 4.0) or k > 80 or ja[STRZALY] <= 0:
                     pusc()
                     t = 0
-            elif t == 3:                                 # fishing rod: cast, hook, reel in
+            elif t == 3:
                 wybierz(4)
                 idx[i, 3] = 0
                 if slot == 4:
@@ -302,7 +286,7 @@ class BotPrzedmioty:
                     pusc()
                     t = 0
                     self.przerwa[i] = 40
-            else:                                        # fight: weapon, shield at the right moment
+            else:
                 wybierz(0)
                 if "tarcza" not in self.umie:            # without a shield nothing is suggested about the right button
                     self.tryb[i] = 0

@@ -1,5 +1,4 @@
-"""Item mastery evaluation: the current network vs itself from before the item stage (which does not use items),
-separately for each loadout, both with ping. > 50% = the item gives the network an edge (it knows how to use it).
+"""Per-loadout evaluation of item use: the current network vs itself from before the item stage, both with ping.
 
   python eval_items.py --nazwa pvp6 --sekundy 60
 """

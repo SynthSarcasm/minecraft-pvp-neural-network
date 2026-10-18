@@ -1,11 +1,7 @@
-"""Arena for testing the assistant: bot v2 (server side) vs a real client running the assistant (the /walcz arena).
+"""Test arena for the assistant on server 3 at 20 tick/s: bot v2 vs a real client that joined with
+/walcz siekiera siekiera. Each round is appended to client_arena.csv, labelled with client_arena_label.txt.
 
-Server 3 (exams, idle) at normal speed 20 ticks/s, 3 arenas: 0–1 empty (players out of play), in arena 2 bot v2
-vs the human (the client joins with /walcz siekiera siekiera — both with a full loadout). Bot v2 plays without ping, as
-in training. Every round -> a line in client_arena.csv labelled with the content of client_arena_label.txt (change it when
-the test conditions change, e.g. "raw_ping0", "smooth_ping200").
-
-    .venv/bin/python -u client_arena.py            # then the client: ./gradlew runClient -Pserwer=127.0.0.1:25568
+  .venv/bin/python -u client_arena.py     # then: ./gradlew runClient -Pserwer=127.0.0.1:25568
 """
 import argparse
 import time
@@ -24,7 +20,7 @@ def main():
     a = argparse.ArgumentParser()
     a.add_argument("--port", type=int, default=25603)
     a.add_argument("--wyniki", default=str(KATALOG / "client_arena.csv"))
-    a.add_argument("--teren", action="store_true", help="random terrain as in stage 6 (bot v2 can get stuck in a pit — 0:0 rounds)")
+    a.add_argument("--teren", action="store_true", help="random terrain as in stage 6 (bot v2 can get stuck in a pit - 0:0 rounds)")
     args = a.parse_args()
     m = Most(3, 20.0, port=args.port)
     _, obs = m.obserwacje()
@@ -40,14 +36,14 @@ def main():
         wyn.write("time,label,result,how,ticks,balance,dealt,taken\n")
     zad = otrz = 0.0
     licz = {}
-    print("arena: ready — client: /walcz siekiera siekiera", flush=True)
+    print("arena: ready - client: /walcz siekiera siekiera", flush=True)
     while True:
         czlowiek = obs[C, M.CZLOWIEK] > 0.5
         idx = bot(obs)
         wys = sedzia.akcje(akcje_z_indeksow(idx))
         sedzia.wyslij(m, wys)
         _, obs_po = m.obserwacje()
-        if czlowiek:                                     # real player's velocity from the position difference (like show.py)
+        if czlowiek:                                     # velocity from the position delta, as in show.py
             krok = obs_po[C, [M.X, M.Y, M.Z]] - obs[C, [M.X, M.Y, M.Z]]
             if np.abs(krok).max() < 1.5:
                 obs_po = obs_po.copy()
@@ -66,7 +62,7 @@ def main():
             k = licz.setdefault(e, [0, 0, 0])
             k[0 if r > 0 else 1 if r < 0 else 2] += 1
             print(f"arena {time.strftime('%H:%M:%S')} [{e}] {'WIN' if r > 0 else 'LOSS' if r < 0 else 'draw'} "
-                  f"({jak}, {sedzia.t_ep[2] / 20:.1f} s, dealt {zad:.0f} / taken {otrz:.0f}) — total W/L/D {k}", flush=True)
+                  f"({jak}, {sedzia.t_ep[2] / 20:.1f} s, dealt {zad:.0f} / taken {otrz:.0f}) - total W/L/D {k}", flush=True)
         if w["swieze"][2] or (w["koniec"][2]):
             zad = otrz = 0.0
         bot.nowa_walka(np.repeat(w["swieze"], 2))

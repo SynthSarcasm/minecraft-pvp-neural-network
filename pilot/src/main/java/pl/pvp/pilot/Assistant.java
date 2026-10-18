@@ -51,20 +51,20 @@ import java.util.UUID;
  * PvP assistant: the network helps a human play on ANY server (without our mod on the server).
  *
  * Keys (configurable in Options -> Controls -> "PvP network"):
- *   R — network ON / OFF (turning it off immediately hands control back to the human and releases the keys),
- *   V — accept the suggested target (the network starts fighting) / stop the fight,
- *   B — next suggestion (the next player in range).
+ *   R - network ON / OFF (turning it off immediately hands control back to the human and releases the keys),
+ *   V - accept the suggested target (the network starts fighting) / stop the fight,
+ *   B - next suggestion (the next player in range).
  * While the network is on, it does not attack anyone by itself: it only suggests a target (the nearest player in range).
  * Exception: a player who damages the user immediately becomes the target (if the network is not fighting anyone).
  *
  * During a fight the mod builds a RAW observation every tick (249 numbers, exactly like PvpBridge.zapiszObs on the training
- * server) from the CLIENT's world — for itself and for the target — and sends it to Python (training/assistant.py). Python
+ * server) from the CLIENT's world - for itself and for the target - and sends it to Python (training/assistant.py). Python
  * sends back an action (10 numbers like ACT), which the mod executes like a human: movement keys, camera turn (≤ 45°/30°
- * per tick), attack click (blocked when the crosshair is not on the target — the network will not hit a bystander by
+ * per tick), attack click (blocked when the crosshair is not on the target - the network will not hit a bystander by
  * accident), right button, hotbar slots.
  *
  * Messages to Python (the same socket 127.0.0.1:8790 as the pilot mode):
- *   10 + int32 tick + uint8 new fight + float32 ping (ms) + uint16 mask of virtual slots 0–8 + float32[2 × 249]
+ *   10 + int32 tick + uint8 new fight + float32 ping (ms) + uint16 mask of virtual slots 0-8 + float32[2 × 249]
  *      (row 0 = me, row 1 = the target)
  *   11                       end of fight
  * From Python: 1 = action (as in Pilot), 6 + uint16 + UTF-8 = "network ready" (version description for the overlay).
@@ -79,10 +79,10 @@ public class Assistant {
 	static KeyMapping klWlacz, klCel, klNastepny;
 	static volatile boolean wlaczona = false;
 	static volatile boolean walka = false;
-	static volatile String wersjaSieci = null;        // set by the socket thread when Python introduces itself
+	static volatile String wersjaSieci = null;
 	static UUID celId, sugestiaId;
 	static int celEncja = -1;                         // target entity id: a respawned player has the same UUID but a new entity
-	static long tpJa = -1000, tpCel = -1000;          // ticks of the latest teleports (mine / the target's)
+	static long tpJa = -1000, tpCel = -1000;
 	static int niewidocznyTicki = 0;
 	static final int MAX_NIEWIDOCZNY = 60;            // 3 s without line of sight = end of fight
 	static UUID zakonczonyId = null;                  // target of the last fight: not suggested for a moment
@@ -97,7 +97,7 @@ public class Assistant {
 	static Vec3 poprzedniaPozCelu = null;
 	static long zamachCelu = -1000;                   // tick of the target's last swing (to estimate its attack bar)
 	static boolean poprzedniZamachCelu = false;
-	static final int[] realny = new int[9];           // virtual network slot -> hotbar slot (−1 = none)
+	static final int[] realny = new int[9];           // virtual network slot -> hotbar slot (-1 = none)
 	static int maskaSlotow = 0;
 	static long trafionyCelTick = -1000;
 	static float yawPrzed, pitchPrzed;                // rotation before the network's decision (for a smooth picture between ticks)
@@ -125,13 +125,12 @@ public class Assistant {
 		Pilot.LOG.info("pvppilot assistant: {}", tekst);
 	}
 
-	// ------------------------------------------------------------------ keys, target, end of fight
 
 	static void koniecTicku(Minecraft mc) {
 		tick++;
 		if (obrocono && mc.player != null) {
 			// the 26.3 client camera renders a turn as a transition yRotO -> yRot in the frames between ticks; the player tick
-			// has already copied the new rotation into yRotO, so restore "before" — the picture flows, logic and packets unchanged
+			// has already copied the new rotation into yRotO, so restore "before" - the picture flows, logic and packets unchanged
 			mc.player.yRotO = yawPrzed;
 			mc.player.xRotO = pitchPrzed;
 		}
@@ -145,9 +144,9 @@ public class Assistant {
 			wlaczona = !wlaczona;
 			if (!wlaczona) {
 				if (walka) zakonczWalke("network turned off");
-				pokaz("Network OFF — you are in control");
+				pokaz("Network OFF - you are in control");
 			} else {
-				pokaz(wersjaSieci == null ? "Network on, but Python is not running (start assistant.py)" : "Network ON — pick a target");
+				pokaz(wersjaSieci == null ? "Network on, but Python is not running (start assistant.py)" : "Network ON - pick a target");
 			}
 		}
 		while (klNastepny.consumeClick()) if (wlaczona && !walka) nastepnaSugestia(mc, true);
@@ -170,7 +169,7 @@ public class Assistant {
 		Player cel = gracz(mc, celId);
 		LocalPlayer ja = mc.player;
 		if (ja.isDeadOrDying()) { zakonczWalke("you died"); return; }
-		if (cel == null) {                                       // the server removes a killed player right away — that is how a win is recognised
+		if (cel == null) {                                       // the server removes a killed player right away - that is how a win is recognised
 			zakonczWalke(tick - trafionyCelTick < 10 ? "target defeated! (disappeared right after a hit)" : "target left the range");
 			return;
 		}
@@ -202,26 +201,25 @@ public class Assistant {
 		List<Player> l = new ArrayList<>();
 		for (Player p : mc.level.players()) {
 			if (p == mc.player || p.isSpectator() || p.isDeadOrDying() || p.isRemoved()) continue;
-			if (p.getUUID().equals(zakonczonyId) && System.currentTimeMillis() < zakonczonyDo) continue;   // the "released target" stays visible
+			if (p.getUUID().equals(zakonczonyId) && System.currentTimeMillis() < zakonczonyDo) continue;
 			if (p.distanceTo(mc.player) <= ZASIEG_SUGESTII) l.add(p);
 		}
 		l.sort((a, b) -> Double.compare(a.distanceToSqr(mc.player), b.distanceToSqr(mc.player)));
 		return l;
 	}
 
-	/** Suggestion = the nearest player in range; "next" = the next one on the list (B). */
 	static void nastepnaSugestia(Minecraft mc, boolean dalej) {
 		List<Player> l = kandydaci(mc);
 		if (l.isEmpty()) { sugestiaId = null; return; }
 		int ten = -1;
 		for (int i = 0; i < l.size(); i++) if (l.get(i).getUUID().equals(sugestiaId)) ten = i;
 		if (dalej) sugestiaId = l.get((ten + 1) % l.size()).getUUID();
-		else if (ten < 0) sugestiaId = l.get(0).getUUID();     // the current suggestion stays while it is in range
+		else if (ten < 0) sugestiaId = l.get(0).getUUID();
 	}
 
 	static void zacznijWalke(Minecraft mc, Player cel, String powod) {
 		if (wersjaSieci == null || !Pilot.polaczony) {
-			pokaz("Python is not running — start assistant.py (the network cannot fight)");
+			pokaz("Python is not running - start assistant.py (the network cannot fight)");
 			return;
 		}
 		LocalPlayer ja = mc.player;
@@ -244,7 +242,7 @@ public class Assistant {
 		trafionyCelTick = -1000;
 		Pilot.akcje.clear();
 		pokaz("FIGHT with " + celNazwa + " (" + powod + ")");
-		mapujSloty(ja);                                         // for the log: how the network's hotbar maps onto the real one
+		mapujSloty(ja);                                         // for the log
 		StringBuilder sb = new StringBuilder();
 		String[] nazwy = {"weapon", "bow", "golden apples", "food", "fishing rod", "blocks", "bucket", "healing", "potion"};
 		for (int v = 0; v < 9; v++)
@@ -280,7 +278,7 @@ public class Assistant {
 				atakujacyTez = atak.getGameProfile().name();
 				atakujacyTezDo = System.currentTimeMillis() + 3000;
 			} else {
-				zamachCelu = tick;   // it hit me, so it has just swung
+				zamachCelu = tick;
 			}
 			return;
 		}
@@ -306,8 +304,8 @@ public class Assistant {
 		KeyMapping k = co == 1 ? klWlacz : co == 2 ? klCel : co == 3 ? klNastepny : null;
 		if (k != null) {
 			KeyMapping.click(KeyMappingHelper.getBoundKeyOf(k));
-			Pilot.LOG.info("pvppilot assistant: test — click {}", k.getTranslatedKeyMessage().getString());
-		} else if (co == 5) {                                   // test: respawn after death (like the "Respawn" button)
+			Pilot.LOG.info("pvppilot assistant: test - click {}", k.getTranslatedKeyMessage().getString());
+		} else if (co == 5) {
 			if (mc.player != null && mc.player.isDeadOrDying()) mc.player.respawn();
 		} else if (co == 4) {
 			net.minecraft.client.Screenshot.grab(mc.gameDirectory, mc.gameRenderer.mainRenderTarget(),
@@ -315,7 +313,6 @@ public class Assistant {
 		}
 	}
 
-	// ------------------------------------------------------------------ control (start of tick)
 
 	static void ustaw(Options o, KeyMapping k, boolean d) {
 		boolean przelacznik = k instanceof ToggleKeyMapping && (
@@ -332,7 +329,7 @@ public class Assistant {
 		Options o = mc.options;
 		for (KeyMapping k : new KeyMapping[]{o.keyUp, o.keyDown, o.keyLeft, o.keyRight, o.keyJump, o.keySprint, o.keyShift, o.keyUse})
 			ustaw(o, k, false);
-		KeyMapping.setAll();                    // keys back to how the human (physically) holds them
+		KeyMapping.setAll();
 	}
 
 	static void poczatekTicku(Minecraft mc) {
@@ -341,14 +338,14 @@ public class Assistant {
 		float dyaw = 0, dpitch = 0;
 		boolean cios = false;
 		int slot = 0;
-		for (float[] x; (x = Pilot.akcje.poll()) != null; ) {    // usually one per tick; when late, turns are summed
+		for (float[] x; (x = Pilot.akcje.poll()) != null; ) {
 			a = x;
 			dyaw += x[5];
 			dpitch += x[6];
 			cios |= x[4] > 0.5f;
 			if (x[8] > 0.5f) slot = Math.round(x[8]);
 		}
-		if (a == null) return;                  // no new decision: keys stay as on the previous tick
+		if (a == null) return;
 		Options o = mc.options;
 		LocalPlayer ja = mc.player;
 		ustaw(o, o.keyUp, a[0] > 0.5f);
@@ -369,7 +366,6 @@ public class Assistant {
 		if (cios) KeyMapping.click(KeyMappingHelper.getBoundKeyOf(o.keyAttack));
 	}
 
-	// ------------------------------------------------------------------ observation (end of tick)
 
 	static int pingMs(Minecraft mc) {
 		PlayerInfo pi = mc.getConnection() == null ? null : mc.getConnection().getPlayerInfo(mc.player.getUUID());
@@ -383,7 +379,7 @@ public class Assistant {
 		poprzedniaPozJa = ja.position();
 		if (teleport && tickWalki - tickTeleportu < 10) teleport = false;   // me and the target moved in adjacent ticks = one reset
 		if (teleport) {
-			tickTeleportu = tickWalki;                                 // e.g. a new round in an arena, respawn, /tp — like a new round in training
+			tickTeleportu = tickWalki;
 			srodekX = (ja.getX() + cel.getX()) / 2;
 			srodekZ = (ja.getZ() + cel.getZ()) / 2;
 			podlogaY = ja.getY();
@@ -398,13 +394,11 @@ public class Assistant {
 		double dy = ja.getY() - podlogaY;                          // training terrain: -4..+5 relative to the floor
 		if (dy > 4) podlogaY += dy - 4;
 		if (dy < -3) podlogaY += dy + 3;
-		// estimated attack bar of the target: since its last swing (the swing is visible — arm animation)
 		boolean zamach = cel.isSwinging();
 		if (zamach && !poprzedniZamachCelu) zamachCelu = tick;
 		poprzedniZamachCelu = zamach;
-		// target velocity: the client only knows its positions; in training it was the velocity from server physics (this tick's
-		// movement after friction and gravity), so convert the same way: horizontally × 0.546 on the ground / × 0.91 in the air,
-		// vertically (dy − 0.08) × 0.98 (checked against a show recording: roughly half the error of the raw position difference)
+		// target velocity from positions, converted like the server physics: horizontal x0.546 on ground / x0.91 in the air,
+		// vertical (dy - 0.08) x 0.98
 		Vec3 pozCelu = cel.position();
 		Vec3 d = poprzedniaPozCelu == null ? Vec3.ZERO : pozCelu.subtract(poprzedniaPozCelu);
 		if (d.lengthSqr() > 4) d = Vec3.ZERO;                  // teleport
@@ -431,7 +425,7 @@ public class Assistant {
 				MobEffects.POISON, MobEffects.SLOWNESS, MobEffects.WEAKNESS};
 	}
 
-	/** One RAW row — fields and order as in PvpBridge.zapiszObs (described in training/bridge.py). "ja" = full knowledge
+	/** One RAW row - fields and order as in PvpBridge.zapiszObs (described in training/bridge.py). "ja" = full knowledge
 	 *  about oneself; about the target (ja == false) only what the client sees: position, movement, angles, HP from entity data,
 	 *  item in hand, blocking / drawing / eating, swing (estimated bar), bobber, arrow in flight, fire, lava. */
 	static void zapiszObs(ByteBuffer b, Minecraft mc, Player p, Player o, Vec3 v, boolean ja) {
@@ -449,7 +443,7 @@ public class Assistant {
 		b.putFloat(ja ? p.getFoodData().getSaturationLevel() : 5);
 		b.putFloat(ja ? p.getAttackStrengthScale(0.5f) : paskCelu(p));
 		b.putFloat(p.hurtTime);
-		b.putFloat(0);   // 13 NIETYK: the training server always reported 0 (measured on a show recording) — same here
+		b.putFloat(0);   // 13 invulnerability: the training server always reported 0
 		b.putFloat(p.onGround() ? 1 : 0);
 		b.putFloat(p.isSprinting() ? 1 : 0);
 		b.putFloat(ja ? celownikNaCelu(mc) : celuje(p, o));
@@ -460,7 +454,7 @@ public class Assistant {
 		int bron = ja ? kodBroni(realny[0] >= 0 ? p.getInventory().getItem(realny[0]) : ItemStack.EMPTY) : kodBroni(p.getMainHandItem());
 		b.putFloat(bron);
 		b.putFloat(p.getArmorValue());
-		// --- items (23–49)
+		// --- items (23-49)
 		Inventory inv = p.getInventory();
 		b.putFloat(ja ? slotWirtualny(inv.getSelectedSlot()) : 0);
 		b.putFloat(kategoria(p.getMainHandItem()));
@@ -491,10 +485,10 @@ public class Assistant {
 		b.putFloat((float) sv.y);
 		b.putFloat((float) sv.z);
 		b.putFloat(s == null ? 0 : 1);
-		b.putFloat(0);                                                          // 47–49 round counters (unused)
+		b.putFloat(0);                                                          // 47-49 round counters (unused)
 		b.putFloat(0);
 		b.putFloat(0);
-		// 50–124: blocks around the player in ITS frame (forward f, right r), levels -1, 0, +1
+		// 50-124: blocks around the player in ITS frame (forward f, right r), levels -1, 0, +1
 		float yr = p.getYRot() * Mth.DEG_TO_RAD;
 		double fx = -Mth.sin(yr), fz = Mth.cos(yr), rx = -Mth.cos(yr), rz = -Mth.sin(yr);
 		for (int dy = -1; dy <= 1; dy++)
@@ -503,7 +497,7 @@ public class Assistant {
 					BlockPos bp = BlockPos.containing(p.getX() + f * fx + r * rx, p.getY() + dy, p.getZ() + f * fz + r * rz);
 					b.putFloat(lv.getBlockState(bp).isAir() ? 0 : 1);
 				}
-		// --- stage 6 (125–248)
+		// --- stage 6 (125-248)
 		ItemStack s6 = ja && realny[6] >= 0 ? inv.getItem(realny[6]) : ItemStack.EMPTY;
 		b.putFloat(s6.is(Items.LAVA_BUCKET) ? 1 : s6.is(Items.BUCKET) ? 2 : 0);
 		b.putFloat(ja ? Math.min(3, ileW(inv, 7)) : 0);
@@ -517,14 +511,14 @@ public class Assistant {
 		b.putFloat(p.getRemainingFireTicks() > 0 ? p.getRemainingFireTicks() / 20f : p.isOnFire() ? 1 : 0);
 		b.putFloat(p.isInLava() ? 1 : 0);
 		b.putFloat(p.isOnFire() ? 1 : 0);
-		// 146–149 I see player k of the "arena": k = 0 is me, k = 1 the target (player 0 = me, player 1 = the target)
+		// 146-149 I see player k of the "arena": k = 0 is me, k = 1 the target (player 0 = me, player 1 = the target)
 		boolean widac = widzi(p, o);
 		b.putFloat(ja ? 0 : widac ? 1 : 0);
 		b.putFloat(ja ? (widac ? 1 : 0) : 0);
 		b.putFloat(0);
 		b.putFloat(0);
 		b.putFloat(0);                                                          // 150 out of play
-		// 151–199 surface height 7×7 around the player (its frame) relative to the feet, 200–248 lava
+		// 151-199 surface height 7×7 around the player (its frame) relative to the feet, 200-248 lava
 		float[] lawy = new float[49];
 		int stopy = Mth.floor(p.getY() + 0.01);
 		for (int f = -3; f <= 3; f++)
@@ -559,7 +553,7 @@ public class Assistant {
 		return hr instanceof EntityHitResult e && e.getEntity().getUUID().equals(celId) ? 1 : 0;
 	}
 
-	/** Whether player p's crosshair points at o within the 3-block attack reach (like PvpBridge.celuje) — for a target looking at me. */
+	/** Whether player p's crosshair points at o within the 3-block attack reach (like PvpBridge.celuje) - for a target looking at me. */
 	static float celuje(Player p, Player o) {
 		Vec3 oko = p.getEyePosition();
 		Vec3 koniec = oko.add(p.getViewVector(1f).scale(3.0));
@@ -591,7 +585,6 @@ public class Assistant {
 		return naj;
 	}
 
-	// ------------------------------------------------------------------ inventory: the network's virtual hotbar
 
 	/** Item category as in PvpBridge.kategoria, but for arbitrary items on someone else's server. */
 	static int kategoria(ItemStack st) {
@@ -614,7 +607,7 @@ public class Assistant {
 		return st.is(ItemTags.SWORDS) ? 1 : st.is(ItemTags.AXES) ? 2 : 0;
 	}
 
-	/** Potion kind as in training (1–10) or 0 = does not match; splash healing = −1 (separate slot 7). */
+	/** Potion kind as in training (1-10) or 0 = does not match; splash healing = -1 (separate slot 7). */
 	static int rodzaj(ItemStack st) {
 		boolean rzucana = st.is(Items.SPLASH_POTION) || st.is(Items.LINGERING_POTION);
 		if (!rzucana && !st.is(Items.POTION)) return 0;
@@ -638,14 +631,14 @@ public class Assistant {
 
 	/** The network knows the training hotbar: 0 weapon, 1 bow, 2 golden apples, 3 food, 4 fishing rod, 5 blocks, 6 lava bucket,
 	 *  7 splash healing potions, 8 another potion. On someone else's server these items are looked up on the real hotbar
-	 *  (slots 1–9) and mapped; a slot that is missing cannot be picked by the network (Python masks that choice). */
+	 *  (slots 1-9) and mapped; a slot that is missing cannot be picked by the network (Python masks that choice). */
 	static void mapujSloty(Player p) {
 		Inventory inv = p.getInventory();
 		java.util.Arrays.fill(realny, -1);
 		boolean[] zajety = new boolean[9];
 		int wybrany = inv.getSelectedSlot();
 		ItemStack w = inv.getItem(wybrany);
-		if (kodBroni(w) > 0) realny[0] = wybrany;                // weapon in hand = network slot 0
+		if (kodBroni(w) > 0) realny[0] = wybrany;
 		for (int k = 0; k < 9 && realny[0] < 0; k++) if (inv.getItem(k).is(ItemTags.AXES)) realny[0] = k;
 		for (int k = 0; k < 9 && realny[0] < 0; k++) if (inv.getItem(k).is(ItemTags.SWORDS)) realny[0] = k;
 		for (int k = 0; k < 9 && realny[0] < 0; k++) if (inv.getItem(k).isEmpty()) realny[0] = k;   // fists
@@ -727,7 +720,6 @@ public class Assistant {
 		return n;
 	}
 
-	// ------------------------------------------------------------------ overlay (top left corner)
 
 	static void rysuj(GuiGraphicsExtractor g, DeltaTracker dt) {
 		Minecraft mc = Minecraft.getInstance();

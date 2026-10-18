@@ -1,9 +1,6 @@
-"""Adds a player to the whitelist of the show server (offline mode, i.e. without account verification).
+"""Add players to the show server's whitelist (offline-mode UUIDs). Restart the server afterwards.
 
-  python add_player.py FriendsNick [OtherNick ...]
-
-The nick must match the launcher exactly (case-sensitive). Takes effect after a server restart
-(show_for_friend.sh does that by itself).
+  python add_player.py Nick [OtherNick ...]
 """
 import hashlib
 import json

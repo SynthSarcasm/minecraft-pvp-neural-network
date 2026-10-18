@@ -1,7 +1,4 @@
-"""Stage-6 smoke test on a server: terrain, 1v3, the teacher (lava, healing, potions), speed.
-
-Player 0 of every arena = the teacher (BotPrzedmioty), the rest = bot v2. Counts: rounds, player-0 results, item uses,
-ticks/s, and checks observation consistency (positions inside the arena, terrain map, NaN).
+"""Stage-6 smoke test: teacher vs bot v2 on terrain and in 1v3; prints speed, results, item use and sanity checks.
 
   python test_stage6.py --port 25603 --areny 12 --multi 4 --sekundy 60
 """

@@ -1,14 +1,5 @@
-"""Stage watchdog: waits until the network has "mastered" the stage and then exits (so whoever started it gets notified).
-
-Mastery = all conditions at once, on two checks in a row:
-  1. plateau: the last three progress tests (with a weapon vs its own version from >= 500 updates earlier) <= 56%
-     (two tests gave false alarms),
-  2. >= 95% wins vs the armed bot v2 (last 300 updates),
-  3. no forgetting: the last fists exam vs the champion (exam --wzor) >= 45%,
-  4. minimum training: >= --min_akt updates since the stage started,
-  5. a real stage gain: with a weapon it wins >= --prog_zysku % vs its own version from before the stage (a mere lack of
-     progress is not mastery),
-  6. fists reached their ceiling: the last 3 fists exams lie within 8 points.
+"""Stage watchdog: exits once all mastery conditions hold on two checks in a row - a progress plateau (3 tests
+<= 56%), the bot gauge, no forgetting of fists, a minimum number of updates, a real stage gain, stable fists exams.
 
   python watchdog.py --nazwa pvp4 --start 8640 --prog_zysku 55
 """
@@ -52,7 +43,7 @@ def sprawdz(nazwa, start, min_akt=1500, prog_zysku=60.0, prog_bota=95.0, prog_pr
         f"stage gain >= {prog_zysku:g}%": zysk is not None and zysk >= prog_zysku,
         "fists stable (3 exams within 8 pts)": len(piesci) == 3 and max(piesci) - min(piesci) <= 8,
     }
-    if prog_przedm:                                    # stage 5: the items that pay off must really be mastered
+    if prog_przedm:                                    # stage 5: bow and shield must actually pay off
         luk = ([e["luk_proc"] for e in wszystkie if "luk_proc" in e] or [None])[-1]
         tarcza = ([e["tarcza_proc"] for e in wszystkie if "tarcza_proc" in e] or [None])[-1]
         warunki[f"bow with fists >= {prog_przedm:g}%"] = luk is not None and luk >= prog_przedm
@@ -70,7 +61,7 @@ def main():
     a.add_argument("--start", type=int, default=3000, help="update at which the stage started")
     a.add_argument("--co_ile", type=float, default=300)
     a.add_argument("--min_akt", type=int, default=1500)
-    a.add_argument("--prog_bota", type=float, default=95.0, help="with ping the bot plays without lag — use a lower value")
+    a.add_argument("--prog_bota", type=float, default=95.0, help="with ping the bot plays without lag - use a lower value")
     a.add_argument("--prog_przedm", type=float, default=0.0, help="stage 5: bow (fists) and shield (weapon) >= this %% vs the pre-stage version")
     a.add_argument("--prog_zysku", type=float, default=60.0)
     args = a.parse_args()
@@ -78,7 +69,7 @@ def main():
     while True:
         try:
             ok, opis, warunki = sprawdz(args.nazwa, args.start, args.min_akt, args.prog_zysku, args.prog_bota, args.prog_przedm)
-        except Exception as e:                         # log being written etc. — try again shortly
+        except Exception as e:                         # log being written etc. - try again shortly
             print(f"{time.strftime('%H:%M')} read error: {e!r}", flush=True)
             time.sleep(60)
             continue

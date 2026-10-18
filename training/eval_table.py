@@ -1,4 +1,4 @@
-"""Markdown table from runs/pvp7/ocena_koncowa*.json — for the results document."""
+"""Markdown table from runs/pvp7/ocena_koncowa*.json - for the results document."""
 import json
 from pathlib import Path
 
@@ -18,7 +18,7 @@ for k, opis in NAZWY:
     for r in w:
         t = r.get(k)
         if not t:
-            kom.append("—")
+            kom.append("-")
             continue
         uz = {"mikstura": t["mikstury"], "p_mikst": t["mikstury"], "leczenie": t["leczenie"], "p_lecz": t["leczenie"],
               "lawa": t["lawa"], "p_lawa": t["lawa"], "wedka": t["haki"]}.get(k)

@@ -1,5 +1,4 @@
-"""Watch report (stage 6): training health, results of the latest updates and exams, comparison with the previous
-window and with the start.
+"""One-off stage-6 report: processes, the latest updates vs the previous window and the start, recent exams.
 
   python watch_report.py --nazwa pvp7 --okno 40
 """
@@ -47,7 +46,7 @@ def okno(w, kol):
     v3 = max(1, s("v3_rund"))
     pb3 = max(1, s("pb3_rund"))
     rp = max(1, s("rund") + s("v3_rund"))
-    return dict(akt=f"{int(a['aktualizacja'][0])}–{int(a['aktualizacja'][-1])}", kps=round(m("kroki_na_s")),
+    return dict(akt=f"{int(a['aktualizacja'][0])}-{int(a['aktualizacja'][-1])}", kps=round(m("kroki_na_s")),
                 ent=round(m("entropia"), 2), kl=round(m("kl"), 3), clip=round(m("clipfrac"), 2),
                 bot_v2=round(100 * s("bot_wygrane") / bot, 1), pula=round(100 * s("pula_wygrane") / pula, 1),
                 remisy=round(100 * s("remisy") / rund, 1), zabic=round(100 * s("zabic") / rund, 1), odl=round(m("odl_self"), 1),

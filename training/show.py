@@ -1,12 +1,8 @@
-"""Fights to watch at normal speed, on a separate server (bridge port 25600, game 127.0.0.1:25566).
+"""The show server at normal speed (bridge 25600, game 127.0.0.1:25566). Arena 0: network vs network, arena 1:
+network vs bot v2, arena 2: network vs bot v2 or vs a human who typed /walcz (training pauses meanwhile via PAUZA).
+Reloads siec_pokaz.pt when training writes a new one.
 
-Arena 0: the latest network vs itself. Arena 1: the network vs the hand-written bot v2.
-Arena 2: the network vs bot v2, and after typing /walcz in game — the network vs YOU (1v1).
-While a human is in arena 2: the PAUZA file pauses training (smoother play), and the fight is recorded
-to recordings/ (state of both players every tick).
-Every 30 s it checks whether training saved a newer version (siec_pokaz.pt) and swaps it in. Runs on CPU.
-
-  python show.py --nazwa pvp2 --z_losowaniem
+  python show.py --nazwa pvp7 --z_losowaniem --lag --przedmioty --etap6
 """
 import argparse
 import json
@@ -29,7 +25,7 @@ from network import Siec, dopasuj, najpewniejsze
 AREN = 3
 KLATKA_CZLOWIEKA = 2
 SLOT_CZLOWIEKA = 2 * KLATKA_CZLOWIEKA + 1               # player from /walcz or the gamepad (instead of bot v2)
-ROZSTAW = 48                                            # like PvpBridge.ROZSTAW: arena centers every 48 blocks
+ROZSTAW = 48                                            # arena spacing, as PvpBridge.ROZSTAW
 
 
 def _varint(x):
@@ -62,8 +58,7 @@ def ludzie_na_serwerze(port_gry=25566):
         _czytaj_varint(f), _czytaj_varint(f)
         tekst = f.read(_czytaj_varint(f)).decode()
     gracze = json.loads(tekst).get("players", {})
-    # names in the status may be hidden ("Anonymous Player"), so count: everyone online minus the arena bots
-    # (a bot replaced by a human in /walcz is still online, "parked" above the arena)
+    # player names in the status can be hidden, so count online players minus arena bots (a replaced bot stays online)
     return max(0, gracze.get("online", 0) - 2 * AREN)
 
 
@@ -170,7 +165,7 @@ def main():
         haslo = (katalog.parent / "server-show" / "pvpmost_haslo.txt").read_text().strip()
         pilot = PilotKlient([f"walcz {args.pilot}"])          # the pilot types the password itself after joining
         dziennik_pilota = open(katalog / "videos" / "dziennik_pilota.csv", "a", buffering=1)
-    probka, ostatnia_probka = [], time.time()           # situations from arenas 0–1 for the panel's x-ray
+    probka, ostatnia_probka = [], time.time()
     pad_X, pad_A, plik_pad = [], [], None
     wynik = dict(w=0, p=0, r=0)
     komunikat = dict(id=0, tekst="")
@@ -184,9 +179,7 @@ def main():
     while True:
         czlowiek_jest = obs[2 * KLATKA_CZLOWIEKA + 1, CZLOWIEK] > 0.5
         ktos_patrzy = obserwator.ludzie > 0
-        # load a new network version only when nobody is fighting (loading with memory under pressure can
-        # stall everything for a while); the network is built once, later only the weights are swapped
-        # with a spectator on the server no new versions are loaded (loading with full memory causes stutter)
+        # swap weights only when nobody fights or watches: loading under memory pressure stalls the server
         if not czlowiek_jest and not (ktos_patrzy and siec is not None) and time.time() - ostatnie_spr > 30:
             ostatnie_spr = time.time()
             if plik.exists() and plik.stat().st_mtime != mtime:
@@ -201,16 +194,16 @@ def main():
         if czlowiek_jest and not pauza.exists():
             pauza.touch()
             plik_nagrania = nagrania / time.strftime("walka_%Y%m%d_%H%M%S.npy")
-            print(f"show: human in the arena — training paused, recording to {plik_nagrania.name}", flush=True)
+            print(f"show: human in the arena - training paused, recording to {plik_nagrania.name}", flush=True)
         if not czlowiek_jest and pauza.exists():
             pauza.unlink(missing_ok=True)
             if nagranie:
                 np.save(plik_nagrania, np.stack(nagranie))
-                print(f"show: human left — training resumes, saved {len(nagranie)} ticks", flush=True)
+                print(f"show: human left - training resumes, saved {len(nagranie)} ticks", flush=True)
             nagranie = []
         if czlowiek_jest:
             k = 2 * KLATKA_CZLOWIEKA
-            nagranie.append(obs[k:k + 2].copy())        # state of the network and the human this tick
+            nagranie.append(obs[k:k + 2].copy())
             if len(nagranie) % 1200 == 0:
                 np.save(plik_nagrania, np.stack(nagranie))
 
@@ -223,9 +216,9 @@ def main():
                 idx_s = (najpewniejsze(siec, logity) if args.bez_losowania else siec.rozklad(logity)[0]).numpy()
                 mysli = mysli_sieci(siec, logity, wartosc, h)
             idx[~jest_bot] = idx_s[~jest_bot]
-            if pilot is not None and pilot.polaczony and czlowiek_jest:   # the network drives a real client in arena 2
+            if pilot is not None and pilot.polaczony and czlowiek_jest:
                 idx[SLOT_CZLOWIEKA] = idx_s[SLOT_CZLOWIEKA]
-            probka.extend(X[:3].astype(np.float16))         # network players in arenas 0 and 1
+            probka.extend(X[:3].astype(np.float16))
             del probka[:-6000]
             if time.time() - ostatnia_probka > 60:
                 ostatnia_probka = time.time()
@@ -237,7 +230,7 @@ def main():
                 wynik = dict(w=0, p=0, r=0)
                 print(f"show: gamepad player joined, recording to {plik_pad.name}", flush=True)
             idx[SLOT_CZLOWIEKA] = pad.akcja(obs[SLOT_CZLOWIEKA])
-            if not sedzia.smiec[KLATKA_CZLOWIEKA]:      # lesson: network input in this situation + the human's move
+            if not sedzia.smiec[KLATKA_CZLOWIEKA]:
                 pad_X.append(X[SLOT_CZLOWIEKA].astype(np.float16))
                 pad_A.append(idx[SLOT_CZLOWIEKA].astype(np.int8))
         if (not gra_padem and plik_pad is not None and pad_X) or (pad_X and len(pad_X) % 2400 == 0):
@@ -249,15 +242,14 @@ def main():
         surowe = akcje_z_indeksow(idx)
         wys = sedzia.akcje(surowe)
         if pilot is not None and pilot.polaczony and czlowiek_jest:
-            # the decision goes to the client immediately (the real client -> server path adds the ~2 tick delay); the
-            # network sees this as ping (lag.staly), so it knows its last turns are still "in flight"
+            # send the decision now; the real client->server path adds ~2 ticks, which the network sees as ping (lag.staly)
             a = surowe[SLOT_CZLOWIEKA].copy()
             a[9] = sedzia.prawy[SLOT_CZLOWIEKA]
             pilot.akcja(a)
-            zrzut_X.append(X[[SLOT_CZLOWIEKA - 1, SLOT_CZLOWIEKA]].astype(np.float32))   # diagnostics: inputs of the network and the pilot
+            zrzut_X.append(X[[SLOT_CZLOWIEKA - 1, SLOT_CZLOWIEKA]].astype(np.float32))
             if len(zrzut_X) % 600 == 0:
                 np.save(katalog / "videos" / "X_pilot.npy", np.stack(zrzut_X))
-            ps = SLOT_CZLOWIEKA                              # diagnostic log: what the pilot network sees and picks
+            ps = SLOT_CZLOWIEKA
             on_ = obs[ps ^ 1]
             blad_ = ((np.degrees(np.arctan2(-(on_[M.X] - obs[ps, M.X]), on_[M.Z] - obs[ps, M.Z])) - obs[ps, M.YAW] + 180) % 360) - 180
             dziennik_pilota.write(f"{int(sedzia.t_ep[KLATKA_CZLOWIEKA])},{obs[ps, M.YAW]:.1f},{blad_:.1f},{a[5]:.0f},{a[4]:.0f},"
@@ -265,15 +257,14 @@ def main():
         sedzia.wyslij(m, wys)
         _, obs_po = m.obserwacje()
         if czlowiek_jest:
-            # real player: the server does not know its velocity (the client computes movement) -> velocity from the
-            # position difference, like for fake players (otherwise the observed velocity was ~4× too small)
+            # the server does not know a real player's velocity: use the position delta, like for fake players
             ps = SLOT_CZLOWIEKA
             krok_ = obs_po[ps, [M.X, M.Y, M.Z]] - obs[ps, [M.X, M.Y, M.Z]]
             if np.abs(krok_).max() < 1.5:                    # no teleport at round start
                 obs_po = obs_po.copy()
                 obs_po[ps, [M.VX, M.VY, M.VZ]] = krok_
         w = sedzia.krok(obs, obs_po)
-        if args.kamera:                                      # arena 0: full loadout, camera through player A's eyes
+        if args.kamera:
             if w["koniec"][0] or sedzia_ustaw_klatke0:
                 sedzia_ustaw_klatke0 = False
                 sedzia.nast_bron[0:2] = [(1, 2), (2, 1), (1, 1), (2, 2)][np.random.randint(4)]
@@ -310,7 +301,7 @@ def main():
         if pilot is not None and pilot.polaczony and not czlowiek_jest and time.time() - ost_walcz > 8:
             ost_walcz = time.time()                          # pilot not in the arena yet: repeat /walcz
             pilot.komenda(f"walcz {args.pilot}")
-        if pilot is not None and pilot.polaczony and czlowiek_jest:  # recording the pilot's rounds (from round start)
+        if pilot is not None and pilot.polaczony and czlowiek_jest:
             ps = SLOT_CZLOWIEKA
             if nagr is not None and not w["swieze"][k]:
                 for kl, pole in (("strzaly", M.STRZALY), ("jedzenie", M.JABLKA), ("steki", M.STEKI)):
@@ -337,13 +328,13 @@ def main():
             zg, b = w["zginal"], sedzia.bilans[2 * k]
             if zg[2 * k + 1] or (w["na_punkty"][k] and b > 0):
                 wynik["p"] += 1
-                tekst = "Loss — the network took you down" if zg[2 * k + 1] else "Loss on points"
+                tekst = "Loss - the network took you down" if zg[2 * k + 1] else "Loss on points"
             elif zg[2 * k] or (w["na_punkty"][k] and b < 0):
                 wynik["w"] += 1
                 tekst = "WIN! You took the network down" if zg[2 * k] else "Win on points"
             else:
                 wynik["r"] += 1
-                tekst = "Draw — time is up"
+                tekst = "Draw - time is up"
             komunikat = dict(id=komunikat["id"] + 1, tekst=tekst)
         bot.nowa_walka(np.repeat(w["swieze"], 2))
         X = sedzia.wejscie_sieci(stos, obs_po, w["swieze"])

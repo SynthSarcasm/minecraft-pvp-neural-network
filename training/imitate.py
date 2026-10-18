@@ -1,11 +1,5 @@
-"""Imitation of bot v2 (behavior cloning + DAgger) as the starting point for PPO.
-
-1. Collection: bot v2 fights itself in all arenas; we store the network input and the bot's move.
-2. Learning: the network learns to predict the bot's move (each head separately) and also the value of the situation
-   (discounted sum of the referee's rewards), so that PPO does not start with a blind value estimate.
-3. DAgger: the network plays by itself (partly), the bot tells what it would do in the same situations; the data
-   accumulates and the network keeps learning. This teaches it to recover from situations the bot would never get into.
-4. Check: network vs bot v2. The result is saved as runs/<nazwa>/siec.pt — PPO resumes from it.
+"""Behaviour cloning + DAgger of bot v2 as the starting point for PPO. Also fits the value head on discounted
+referee rewards. Saves runs/<nazwa>/siec.pt, which train.py --wznow resumes from.
 
   python imitate.py --nazwa pvp2
 """
@@ -25,7 +19,7 @@ from network import Siec, najpewniejsze
 class Sesja:
     """Server connection together with the game state. The server always waits for our actions for the last
     observation, so the subsequent phases (collection, DAgger, check) must continue from it instead of
-    reading a new one — otherwise both sides wait for each other."""
+    reading a new one - otherwise both sides wait for each other."""
 
     def __init__(self, areny, rng):
         self.most = Most(areny, 10000)
@@ -65,7 +59,7 @@ def zbierz(ses, siec, dev, ticki, udzial_sieci, rng, gamma):
         bM[t] = ~np.repeat(ses.sedzia.smiec, 2)
         w = ses.krok(idx)
         bR[t], bD[t] = w["r"], np.repeat(w["koniec"], 2)
-    # returns (target for the value head); the unfinished tail has no bootstrap — drop the last 300 ticks
+    # value targets; the last 300 ticks have no bootstrap, so drop them
     G = np.zeros((ticki, n), np.float32)
     g = np.zeros(n, np.float32)
     for t in reversed(range(ticki)):
@@ -175,7 +169,7 @@ def main():
 
     for losowo in (False, True):
         W, P, R = sprawdzian(ses, siec, dev, 8000, losowo)
-        print(f"check ({'sampled' if losowo else 'most likely move'}): network vs bot v2 — "
+        print(f"check ({'sampled' if losowo else 'most likely move'}): network vs bot v2 - "
               f"wins {W}, losses {P}, draws {R} ({100 * W / max(1, W + P + R):.0f}% wins)", flush=True)
     ses.most.zamknij()
 

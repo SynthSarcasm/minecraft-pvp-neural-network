@@ -1,7 +1,7 @@
 # Glossary: Polish identifiers → English
 
 File and folder names are in English. Inside the code, function, variable and option names, the keys of logs and JSON
-files, the in-game commands (`/walcz`, `/haslo`) and the names of files the code writes at runtime are still Polish —
+files, the in-game commands (`/walcz`, `/haslo`) and the names of files the code writes at runtime are still Polish -
 renaming them would break the saved checkpoints (PyTorch stores weights under the attribute names), the training logs and
 the result files. This page translates them.
 
@@ -17,7 +17,7 @@ the result files. This page translates them.
 | `pula/`, `pula_stala/`, `archiwum/` | opponent pool, fixed pool (anchor), permanent archive |
 | `egzamin_wersje/` | copies of the versions that took an exam |
 | `log.csv` | training log (columns below) |
-| `egzamin.json`, `egzamin6.json`, `ocena_przedmiotow.json`, `ocena_koncowa*.json`, `turniej_obcy.json` | exams (stages 1–5, stage 6), item evaluation, final evaluation, tournament results |
+| `egzamin.json`, `egzamin6.json`, `ocena_przedmiotow.json`, `ocena_koncowa*.json`, `turniej_obcy.json` | exams (stages 1-5, stage 6), item evaluation, final evaluation, tournament results |
 | `historia_martwych.json` | dead-neuron history for the dashboard |
 | `training/recordings/lekcje_*.npz`, `walka_*.npy`, `pad_*.npz` | teacher lessons, recorded human fights in the show, gamepad lessons |
 | `training/videos/` | recordings from the client (camera/pilot), `dziennik_pilota.csv` = pilot diagnostic log |
@@ -87,7 +87,7 @@ For readers of older notes or logs.
 | `--wznow` | resume from `siec.pt` |
 | `--porty`, `--rcony` | bridge ports, RCON ports |
 | `--areny`, `--multi`, `--multi_pvpbot` | arenas per server, 1v3 arenas, 1v3 arenas with pvp-bot |
-| `--bronie`, `--przedmioty`, `--lag`, `--etap6` | weapons (stages 2–3), items (stage 5), ping (stage 4+), stage 6 |
+| `--bronie`, `--przedmioty`, `--lag`, `--etap6` | weapons (stages 2-3), items (stage 5), ping (stage 4+), stage 6 |
 | `--kara_remis` | draw penalty |
 | `--entropia`, `--entropia_skok`, `--glowy_zachety`, `--wygaszanie` | entropy bonus, extra bonus, which heads, decay |
 | `--udzial_pula`, `--udzial_bot` | share of pool / bot arenas |

@@ -1,9 +1,6 @@
-"""Forgetting test: does a network learning a new stage keep its old skills.
-
-Every --co_ile seconds the current network (the run's siec_pokaz.pt) fights with FISTS ONLY against a frozen "fists
-champion" (the last stage-1 version) on a separate server. These fights are not used for learning — a pure measurement.
-~50% = holds the champion's level; clearly less = forgetting. Also a progress test and the stage-gain test.
-Results: runs/<nazwa>/egzamin.json (read by the panel).
+"""Exams for stages 1-5 on a separate server (never used for learning): fists vs the fists champion
+(forgetting), weapons vs a version >= 500 updates older (progress) and vs the pre-stage version (stage gain).
+Results go to runs/<nazwa>/egzamin.json.
 
   python exam.py --nazwa pvp3 --wzor runs/pvp2/siec.pt --port 25603
 """
@@ -30,8 +27,8 @@ def wczytaj(sciezka):
     return s, z.get("aktualizacja")
 
 
-ZESTAWY_POSTEPU = [((1, 2), 1.0), ((2, 1), 1.0), ((1, 1), 1.0), ((2, 2), 1.0)]   # weapons only, uniformly
-# stage 5: progress on the training loadouts without fists, stage gain on the full loadout (all items)
+ZESTAWY_POSTEPU = [((1, 2), 1.0), ((2, 1), 1.0), ((1, 1), 1.0), ((2, 2), 1.0)]
+# stage 5: progress on item loadouts without fists, stage gain on the full loadout
 ZESTAWY_PRZEDM = [z for z in ZESTAWY_ETAP5 if z[0] != (0, 0)]
 ZESTAWY_PELNE = [(b, 31, 1.0) for b in [(1, 2), (2, 1), (1, 1), (2, 2)]]
 
@@ -90,7 +87,7 @@ def main():
     while True:
         try:
             cykl(args, mistrz, wzor_etapu, wyniki, plik_wynikow)
-        except (ConnectionError, OSError) as e:           # server busy / connection dropped: try again shortly
+        except (ConnectionError, OSError) as e:
             print(f"exam: connection lost ({e!r}), retrying in 30 s", flush=True)
             time.sleep(30)
             continue
@@ -105,7 +102,6 @@ def cykl(args, mistrz, wzor_etapu, wyniki, plik_wynikow):
         rund = W + P + R
         wynik = dict(czas=time.time(), akt=akt, wygrane=W, przegrane=P, remisy=R,
                      proc=round(100 * W / max(1, rund), 1), zadane=round(zad), otrzymane=round(otrz))
-        # progress test: with a weapon against its own version from >= 500 updates earlier
         wersje = KAT / "runs" / args.nazwa / "egzamin_wersje"
         wersje.mkdir(exist_ok=True)
         stare = sorted((int(p.stem[1:]), p) for p in wersje.glob("u*.pt"))
@@ -116,30 +112,30 @@ def cykl(args, mistrz, wzor_etapu, wyniki, plik_wynikow):
             Wp, Pp, Rp, _, _ = egzamin(args.port, biezaca, stara, args.sekundy_postepu, args.areny,
                                        ZESTAWY_PRZEDM if args.przedmioty else ZESTAWY_POSTEPU, args.lag)
             wynik.update(postep_proc=round(100 * Wp / max(1, Wp + Pp + Rp), 1), postep_rund=Wp + Pp + Rp, postep_wzgledem=a_st)
-            print(f"   progress with weapons: version {akt} vs {a_st} — {Wp}:{Pp} (draws {Rp}), {wynik['postep_proc']}% wins",
+            print(f"   progress with weapons: version {akt} vs {a_st} - {Wp}:{Pp} (draws {Rp}), {wynik['postep_proc']}% wins",
                   flush=True)
-        if args.wzor_etapu:                              # stage gain: with a weapon against the pre-stage version
+        if args.wzor_etapu:
             przed, a_prz = wczytaj(KAT / args.wzor_etapu)
             Wz, Pz, Rz, _, _ = egzamin(args.port, biezaca, przed, args.sekundy_postepu, args.areny,
                                        ZESTAWY_PELNE if args.przedmioty else ZESTAWY_POSTEPU, args.lag)
             wynik.update(zysk_proc=round(100 * Wz / max(1, Wz + Pz + Rz), 1), zysk_rund=Wz + Pz + Rz)
-            print(f"   stage gain with weapons: version {akt} vs pre-stage ({a_prz}) — {Wz}:{Pz}, {wynik['zysk_proc']}%",
+            print(f"   stage gain with weapons: version {akt} vs pre-stage ({a_prz}) - {Wz}:{Pz}, {wynik['zysk_proc']}%",
                   flush=True)
-        if args.przedmioty and args.wzor_etapu:          # mastery of the items that pay off (eval_items.py)
+        if args.przedmioty and args.wzor_etapu:
             from eval_items import ZESTAWY as ZP, walki
             for klucz, nazwa in (("luk", "fists + bow"), ("tarcza", "weapon + shield")):
                 r = walki(args.port, biezaca, przed, ZP[nazwa], 60, args.areny)
                 wynik[f"{klucz}_proc"] = r["proc"]
                 wynik[f"{klucz}_uzycie"] = r["strz"] if klucz == "luk" else r["blok"]
-                print(f"   {nazwa}: version {akt} vs pre-stage — {r['wygrane']}:{r['przegrane']}, {r['proc']}% "
+                print(f"   {nazwa}: version {akt} vs pre-stage - {r['wygrane']}:{r['przegrane']}, {r['proc']}% "
                       f"(per round: arrows {r['strz']}, hits {r['traf']}, shield {r['blok']})", flush=True)
         torch.save({"wagi": {k: (v.half() if v.is_floating_point() and v.dim() > 0 else v) for k, v in biezaca.state_dict().items()}, "aktualizacja": akt},
-                   wersje / f"u{akt:06d}.pt")                 # exactly the version that took the exam
+                   wersje / f"u{akt:06d}.pt")
         for _, p in stare[:-11]:                         # keep ~12 latest copies (~50 MB each)
             p.unlink(missing_ok=True)
         wyniki.append(wynik)
         plik_wynikow.write_text(json.dumps(wyniki))
-        print(f"exam {time.strftime('%H:%M')}: version {akt} vs fists champion — {W}:{P} (draws {R}), "
+        print(f"exam {time.strftime('%H:%M')}: version {akt} vs fists champion - {W}:{P} (draws {R}), "
               f"{wynik['proc']}% wins, damage {zad:.0f}:{otrz:.0f}", flush=True)
 
 

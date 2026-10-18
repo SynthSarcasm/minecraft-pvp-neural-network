@@ -6,10 +6,10 @@
 | `training/panel_web/chart.umd.min.js` | [Chart.js](https://www.chartjs.org/) 4.4.1 | MIT (text below) |
 | `*/gradle/wrapper/gradle-wrapper.jar`, `*/gradlew` | [Gradle](https://gradle.org/) wrapper | Apache License 2.0 |
 
-Minecraft, the Minecraft server, Fabric, Fabric API and Carpet are **not** included — `docs/setup.md` explains where to
+Minecraft, the Minecraft server, Fabric, Fabric API and Carpet are **not** included - `docs/setup.md` explains where to
 get them. The dashboard loads the "Pixelify Sans" font from Google Fonts (SIL Open Font License).
 
-## Chart.js — The MIT License (MIT)
+## Chart.js - The MIT License (MIT)
 
 Copyright (c) 2014-2022 Chart.js Contributors
 

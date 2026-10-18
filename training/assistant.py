@@ -1,21 +1,12 @@
-"""PvP assistant: the network (stage-6 champion) plays through a real client via the "pvppilot" client mod (Assistant.java).
+"""PvP assistant, Python side: the pvppilot client mod (Assistant.java) sends observations, this script answers
+with actions from the network.
 
-Start it BEFORE joining the game or while playing (it connects by itself and reconnects after a disconnect):
-    cd "<project folder>/training"
-    .venv/bin/python -u assistant.py
+The observation is the same RAW 249 layout as on the training server, built from the client's world, so the network
+input is computed with the training code (features.Sedzia.wejscie_sieci). Differences from training: the target is
+already delayed by the client, so only the ping is fed in; positions are relative to a virtual arena center; round time
+is capped at 30 s; slots without an item are masked.
 
-During a fight the mod sends an observation every tick (RAW 249 for me and the target, built from the client's world),
-the ping and a slot mask; here the network input is built from it with EXACTLY the same functions as in training
-(features.Sedzia.wejscie_sieci: 4-tick stack, target HP = 20 minus its losses, actions "in flight" and delays from the
-real ping), an action is sampled as in training and sent back (10 numbers like ACT). The client executes it like a
-human would (keys, turning, clicks).
-
-Differences from training (deliberate assumptions, see docs/assistant.md):
-- The real client already sees the target delayed (ping + movement smoothing), so it is NOT delayed a second time;
-  the network only gets the ping information (actions: round(ping/100) ticks, view: +1), as in training.
-- Positions are relative to a virtual arena center (midpoint between the players at fight start, follows the player).
-- Round time on the input stops at 30 s (T_MAX) — a real fight has no 60 s limit.
-- Hotbar slots without an item are blocked (mask from the mod).
+  .venv/bin/python -u assistant.py
 """
 import argparse
 import socket
@@ -31,8 +22,8 @@ from features import GLOWY, Lag, Sedzia, Stos, akcje_z_indeksow
 from exam import wczytaj
 
 KATALOG = Path(__file__).parent
-T_MAX = 600                       # ticks: round time on the network input grows to 30 s at most
-OFFSET_SLOTU = sum(GLOWY[:7])     # start of the "slot" head in the logits (0 = no change, 1–9 = slot 0–8)
+T_MAX = 600                       # 30 s cap on the round-time input
+OFFSET_SLOTU = sum(GLOWY[:7])     # first logit of the slot head
 NAZWY_SLOTOW = ["weapon/fist", "bow", "golden apples", "food", "fishing rod", "blocks", "lava bucket", "healing", "potion"]
 
 
@@ -58,19 +49,17 @@ class LagKlienta(Lag):
 
 
 class Wygladzanie:
-    """Human-like camera movement and "calm mode" (raw network output turns the camera up to 45°/tick = 900°/s,
-    and far from the target the network jumps and spins the crosshair around).
+    """Camera smoothing and "calm mode" for the client.
 
-    Turning: the speed approaches the one requested by the network, but accelerates by at most PRZYSP °/tick per tick,
-    brakes faster (HAMUJ — less overshoot) and never exceeds MAX °/tick. The network sees its real turn on the next tick,
-    so it corrects the rest by itself — the whole thing works like a controller.
-    Calm (target farther than ODL_SPOKOJU or hidden): slower camera, small turns (≤ STREFA°) ignored,
-    jumping only in front of an obstacle (a block at foot level 1–2 blocks ahead of the player) or in lava."""
+    Turn speed moves towards the requested one, accelerating by at most PRZYSP deg/tick per tick and braking by HAMUJ;
+    the network sees the executed turn on the next tick and corrects the rest. In calm mode (target far or hidden) the
+    camera is slower, tiny turns are ignored and jumping is only allowed in front of an obstacle or in lava.
+    """
 
     ZWYKLE = dict(yaw=(20.0, 6.0, 15.0), pitch=(10.0, 5.0, 10.0), strefa=0.0)       # (MAX, ACCEL, BRAKE) °/tick
     SPOKOJ = dict(yaw=(8.0, 3.0, 8.0), pitch=(5.0, 2.0, 5.0), strefa=3.0)
     ODL_SPOKOJU = 6.0
-    PRZESZKODA = (M.VOKSELE + 25 + 15 + 2, M.VOKSELE + 25 + 20 + 2)   # foot level (dy 0), 1 and 2 blocks ahead (f +1/+2), r 0
+    PRZESZKODA = (M.VOKSELE + 25 + 15 + 2, M.VOKSELE + 25 + 20 + 2)   # foot-level blocks 1 and 2 ahead
 
     def __init__(self, spokoj=True):
         self.spokoj = spokoj
@@ -108,7 +97,7 @@ class Wygladzanie:
 
 
 class Walka:
-    """State of one fight (like a training round): a referee with one 1v1 "arena" — player 0 = me, player 1 = the target."""
+    """State of one fight (like a training round): a referee with one 1v1 "arena" - player 0 = me, player 1 = the target."""
 
     def __init__(self, rng):
         self.sedzia = Sedzia(1, lag=True, rng=rng)
@@ -151,7 +140,7 @@ def main():
     a = argparse.ArgumentParser()
     a.add_argument("--siec", default=str(KATALOG / "runs" / "pvp7" / "champion_stage6.pt"))
     a.add_argument("--port", type=int, default=8790)
-    a.add_argument("--najpewniejsze", action="store_true", help="no sampling (in training the network played with sampling — better)")
+    a.add_argument("--najpewniejsze", action="store_true", help="no sampling (in training the network played with sampling - better)")
     a.add_argument("--dziennik", default=str(KATALOG / "assistant_fights.csv"), help="one line per fight")
     a.add_argument("--surowo", action="store_true", help="no camera smoothing and no calm mode (as in training)")
     a.add_argument("--bez_spokoju", action="store_true", help="camera smoothing on, but no calm mode")
@@ -183,12 +172,12 @@ def main():
         s.sendall(bytes([6]) + struct.pack(">H", len(b)) + b)
         if args.scenariusz:
             threading.Thread(target=scenariusz, args=(s, zamek, args.scenariusz), daemon=True).start()
-        print("assistant: connected to Minecraft — waiting for a fight (R = network on, V = fight)", flush=True)
+        print("assistant: connected to Minecraft - waiting for a fight (R = network on, V = fight)", flush=True)
         walka, czasy, ping, wyg = None, [], 0.0, None
         try:
             while True:
                 typ = czytaj(s, 1)[0]
-                if typ == 11:                                    # end of fight
+                if typ == 11:
                     if args.nagrywaj and walka is not None:
                         with zamek:
                             s.sendall(b"\x03")
@@ -203,11 +192,11 @@ def main():
                 obs = np.frombuffer(d[11:], dtype="<f4").reshape(2, M.RAW).copy()
                 t0 = time.perf_counter()
                 if nowa or walka is None:
-                    poczatek = walka is None                         # a real fight start (not a teleport mid-fight)
+                    poczatek = walka is None                         # not a mid-fight teleport
                     if walka is not None:
                         zakoncz(walka, czasy, ping, dziennik, args.zrzut)
                     walka, czasy = Walka(rng), []
-                    if args.nagrywaj and poczatek:                   # record this fight from the network's eyes (60 fps)
+                    if args.nagrywaj and poczatek:
                         Path(args.nagrywaj).mkdir(parents=True, exist_ok=True)
                         film = str(Path(args.nagrywaj).resolve() / (time.strftime("walka_%H%M%S")
                                    + ("_surowo" if args.surowo else "_gladko") + ".mp4"))
@@ -223,7 +212,7 @@ def main():
                 with torch.no_grad():
                     logity = siec(torch.as_tensor(X[:1]))[0]
                     zakaz = [v for v in range(9) if not (maska >> v) & 1]
-                    for v in zakaz:                              # a slot without an item cannot be picked
+                    for v in zakaz:
                         logity[0, OFFSET_SLOTU + 1 + v] = -1e9
                     if args.najpewniejsze:
                         idx = torch.stack([l.argmax(-1) for l in torch.split(logity, siec.glowy, dim=-1)], 1)
@@ -232,12 +221,12 @@ def main():
                 idx2 = np.zeros((2, len(GLOWY)), np.int64)
                 idx2[0] = idx[0].numpy()
                 surowe = akcje_z_indeksow(idx2)
-                prosi = surowe[0, [2, 5, 6]].copy()                 # jump, yaw, pitch — network decision before smoothing
+                prosi = surowe[0, [2, 5, 6]].copy()                 # before smoothing
                 if wyg is not None:
                     if nowa:
                         wyg.reset()
-                    surowe[0] = wyg(surowe[0], obs)              # the "in flight" history gets what is really executed
-                walka.sedzia.akcje(surowe)                       # right button (state) + history of decisions "in flight"
+                    surowe[0] = wyg(surowe[0], obs)              # lag history must hold what was actually executed
+                walka.sedzia.akcje(surowe)
                 akc = surowe[0].copy()
                 akc[9] = walka.sedzia.prawy[0]
                 with zamek:
@@ -246,7 +235,7 @@ def main():
                 if args.zrzut:
                     walka.zrzut.append((obs, X[0].astype(np.float32), akc, ping, prosi))
         except (ConnectionError, OSError) as e:
-            print(f"assistant: disconnected ({e}) — waiting for Minecraft", flush=True)
+            print(f"assistant: disconnected ({e}) - waiting for Minecraft", flush=True)
             if walka is not None:
                 zakoncz(walka, czasy, ping, dziennik, args.zrzut)
             walka = None

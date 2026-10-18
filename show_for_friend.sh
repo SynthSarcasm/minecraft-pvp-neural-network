@@ -1,15 +1,12 @@
 #!/bin/zsh
-# Show for a friend outside your home network: show server + network + bore tunnel.
-# The friend connects to bore.pub:<port> (a new port on every start),
-# types /haslo <password> (if server-show/pvpmost_haslo.txt exists), then /walcz [piesci|miecz|siekiera] [network's weapon].
-# Stop: ./stop_show.sh
+# Show server + network + a bore tunnel, so a friend can join from outside. Stop with ./stop_show.sh.
 cd "$(dirname "$0")"
 KAT="$PWD"
 
 if ! pgrep -f "pvpmost.port=25600" >/dev/null; then
   (cd server-show && nohup ./start.sh > server.log 2>&1 &)
   echo "starting the show server…"
-  until nc -z 127.0.0.1 25600 2>/dev/null; do sleep 1; done   # the mod opens the Python bridge when the server is ready
+  until nc -z 127.0.0.1 25600 2>/dev/null; do sleep 1; done
 fi
 if ! pgrep -f "show.py --nazwa" >/dev/null; then
   (cd training && nohup .venv/bin/python -u show.py --nazwa pvp7 --z_losowaniem --lag --przedmioty --etap6 > show_pvp7.log 2>&1 &)

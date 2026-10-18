@@ -1,10 +1,6 @@
-"""Final evaluation of stage-6 candidates (longer tests than egzamin6, same rules).
+"""Long final evaluation of checkpoints with the exam6 tests; results go to runs/pvp7/ocena_koncowa.json.
 
-  python eval_final.py --port 25603 --rcon 25577 --serwer server3 --sekundy 120 runs/pvp7/a.pt runs/pvp7/b.pt
-
-For every file: 1v3 vs pvp-bot (full loadout / enemies with shield, food and healing), 1v1 vs pvp-bot, terrain and
-weapons only vs the pre-stage network, items (weapon + item, fists + item), fists vs the fists champion.
-Results are appended to runs/pvp7/ocena_koncowa.json.
+  python eval_final.py --port 25603 --rcon 25577 --serwer server3 runs/pvp7/a.pt runs/pvp7/b.pt
 """
 import argparse
 import json

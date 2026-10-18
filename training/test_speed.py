@@ -1,8 +1,4 @@
-"""Speed test: how many steps per second a real server with fighting bots delivers.
-
-Bots are driven by a simple script (chase, aim, attack with a full attack bar) to
-check along the way that combat works. Optionally a large network is also evaluated on the
-whole observation batch every step — to measure the cost of the network in the loop.
+"""Throughput test with scripted bots; optionally also times a dense network on every step.
 
   python test_speed.py --areny 16 --tempo 10000 --sekundy 30 [--siec 2048x4]
 """
@@ -20,10 +16,10 @@ def bot_skryptowy(obs, los):
     # yaw in Minecraft: direction (-sin, cos)
     chce_yaw = np.degrees(np.arctan2(-dx, dz))
     dyaw = (chce_yaw - ja[:, YAW] + 180) % 360 - 180
-    akc[:, 0] = 1.0                                     # forward
+    akc[:, 0] = 1.0
     akc[:, 1] = los.choice([-1.0, 0.0, 1.0], n, p=[0.15, 0.7, 0.15])
-    akc[:, 2] = los.random(n) < 0.05                    # occasional jump
-    akc[:, 3] = 1.0                                     # sprint
+    akc[:, 2] = los.random(n) < 0.05
+    akc[:, 3] = 1.0
     akc[:, 4] = (ja[:, CELUJE] > 0.5) & (ja[:, PASEK] > 0.95)
     akc[:, 5] = np.clip(dyaw + los.normal(0, 4, n), -45, 45)
     akc[:, 6] = -ja[:, 7] * 0.5                         # look horizontally
@@ -35,7 +31,7 @@ def main():
     a.add_argument("--areny", type=int, default=16)
     a.add_argument("--tempo", type=float, default=10000)
     a.add_argument("--sekundy", type=float, default=30)
-    a.add_argument("--siec", default="", help="e.g. 2048x4 — evaluates such a network every step")
+    a.add_argument("--siec", default="", help="e.g. 2048x4 - evaluates such a network every step")
     a.add_argument("--urzadzenie", default="cpu")
     a.add_argument("--pokaz", type=int, default=0, help="print the state of arena 0 every N steps")
     args = a.parse_args()

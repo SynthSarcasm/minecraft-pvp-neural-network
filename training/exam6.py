@@ -1,20 +1,8 @@
-"""Stage-6 exams (server 3, every --co_ile s): does the network meet the stage goals.
+"""Stage-6 exams on server 3 (12 1v1 arenas + 8 1v3 arenas with pvp-bot over RCON). Never used for learning.
 
-Fixed layout of server 3: 12 1v1 arenas + 8 1v3 arenas (enemies in 1v3 = pvp-bot-fabric from GitHub, driven server-side
-via RCON). Each test uses only its own arenas, the rest stay empty. Exam fights are NOT used for learning.
-
-Tests (our network = the run's current siec_pokaz.pt, with ping as in training; pvp-bot without ping):
-  v3_pelny   — 1v3 vs pvp-bot, everyone with a full loadout, terrain         (goal: win)
-  v3_bron    — 1v3 vs pvp-bot, enemies with weapon and armor only, terrain
-  v1_pvpbot  — 1v1 vs pvp-bot, full loadout, terrain
-  teren      — 1v1 vs the pre-stage version (end of pvp6), full loadout, terrain (stage gain)
-  bron       — 1v1 vs the pre-stage version, weapons only on terrain (reference for the item tests)
-  lawa / leczenie / mikstura / wedka — 1v1 vs the pre-stage version, weapon + only this item (how much it gives, is it used)
-  p_bron / p_lawa / p_lecz / p_mikst — fists (no armor) vs the pre-stage version: plain / + lava / + healing /
-               + offensive potion (here the item is the main weapon)
-  piesci     — fists on flat ground vs the fists champion (forgetting test)
-  postep     — vs its own version from >= 300 updates earlier, stage-6 loadouts (plateau)
-Results: runs/<nazwa>/egzamin6.json.
+Tests: v3_pelny / v3_bron (1v3 vs pvp-bot, full loadout / weapon only), v1_pvpbot, teren (vs the pre-stage version on
+terrain), bron / lawa / leczenie / mikstura / wedka (weapon + one item vs pre-stage), p_* (fists + item), piesci
+(fists vs the fists champion), postep (vs a version >= 300 updates older). Results: runs/<nazwa>/egzamin6.json.
 
   python exam6.py --nazwa pvp7 --co_ile 600
 """
@@ -48,8 +36,7 @@ def walki(port, nasza, przeciwnik, sekundy, zestawy=None, multi=False, zestawy_m
                  teren=teren, aktywne=aktywne, kara_remis=0.8)
     stos = Stos(n)
     akt_g = aktywne[u.klatka]
-    # 1v1: our network alternates between player 0 and 1 of the arena (removes any seat bias between the two positions);
-    # 1v3: always player 0
+    # 1v1: alternate seats to cancel any seat bias; 1v3: always player 0
     zamiana = ~u.multi & (np.arange(AREN) % 2 == 1)
     nasz_k = np.where(zamiana, 1, 0)[u.klatka]
     nasi = (u.k == nasz_k) & akt_g

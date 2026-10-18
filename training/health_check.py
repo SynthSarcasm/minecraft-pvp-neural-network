@@ -1,7 +1,5 @@
-"""Quick training health check: is everything running and is the network learning properly.
-
-Compares the latest window of updates with the previous one and with the end of the previous stage, checks processes,
-exams, the watchdog and memory. Ends with a list of WARNINGS (empty = all normal).
+"""One-off training health report: processes, the latest window of updates vs the previous one and the end of
+the previous stage, exams, watchdog, swap; ends with a list of warnings.
 
   python health_check.py --nazwa pvp4 --poprzedni pvp3 --okno 50
 """
@@ -81,7 +79,6 @@ def main():
     ostrzezenia = []
     print(time.strftime("check %H:%M:%S"))
 
-    # processes
     stan = {}
     for n, w in [("training", "train.py --nazwa " + args.nazwa), ("show", "show.py --nazwa"), ("panel", "panel.py --nazwa"),
                  ("exam", "exam.py --nazwa"), ("watchdog", "watchdog.py --nazwa"), ("caffeinate", "caffeinate -i -w"),
@@ -124,39 +121,37 @@ def main():
                   f"accuracy {100 * p_['traf_strzala'] / max(1, p_['strzaly']):.0f}%) | hits on shield {p_['blokady'] / rr:.2f} | "
                   f"eaten {p_['zjedzone'] / rr:.2f} | rod hooks {p_['haki'] / rr:.2f} | blocks {p_['bloki_post'] / rr:.2f} | rounds {rr:.0f}")
 
-    # optimization health
     for x in r[-k:]:
         for kol in ("entropia", "kl", "strata_wartosci"):
             v = f(x, kol)
             if v is not None and (math.isnan(v) or math.isinf(v)):
                 ostrzezenia.append(f"{kol} = {v} at update {x['aktualizacja']} (NaN/inf!)")
     if teraz["kl"] > 0.05:
-        ostrzezenia.append(f"high KL: mean {teraz['kl']:.3f} (normal ~0.01–0.03; panel alarm 0.12)")
+        ostrzezenia.append(f"high KL: mean {teraz['kl']:.3f} (normal ~0.01-0.03; panel alarm 0.12)")
     if teraz["ent"] < 0.25:
-        ostrzezenia.append(f"low entropy {teraz['ent']:.3f} — possible policy collapse")
-    if teraz["ent"] > 2.5:                               # from stage 5 on two more heads (slot, right button) -> higher sum
-        ostrzezenia.append(f"high entropy {teraz['ent']:.3f} — the network plays more and more randomly")
+        ostrzezenia.append(f"low entropy {teraz['ent']:.3f} - possible policy collapse")
+    if teraz["ent"] > 2.5:                               # slot and right-button heads add entropy
+        ostrzezenia.append(f"high entropy {teraz['ent']:.3f} - the network plays more and more randomly")
     if teraz["bot_n"] >= 50 and teraz["bot"] < args.prog_bota:
         ostrzezenia.append(f"only {teraz['bot']:.0f}% vs bot v2")
     if teraz["pula_n"] >= 100 and teraz["pula"] < 40:
-        ostrzezenia.append(f"only {teraz['pula']:.0f}% vs the pool — getting weaker")
+        ostrzezenia.append(f"only {teraz['pula']:.0f}% vs the pool - getting weaker")
     if teraz["remisy"] > 5:
-        ostrzezenia.append(f"draws {teraz['remisy']:.1f}% — possible stalemate")
+        ostrzezenia.append(f"draws {teraz['remisy']:.1f}% - possible stalemate")
     if teraz["odl"] and teraz["odl"] > 6:
-        ostrzezenia.append(f"mean distance {teraz['odl']:.1f} — possible running away/stalemate")
+        ostrzezenia.append(f"mean distance {teraz['odl']:.1f} - possible running away/stalemate")
 
-    # exams
     p = KAT / "runs" / args.nazwa / "egzamin.json"
     egz = json.loads(p.read_text()) if p.exists() else []
     print("exams (version: fists vs reference | progress | stage gain):")
     for e in egz[-5:]:
         print(f"   {time.strftime('%H:%M', time.localtime(e['czas']))} v{e['akt']}: {e['proc']}% "
-              f"| {e.get('postep_proc', '—')}{'' if 'postep_wzgledem' not in e else ' vs ' + str(e['postep_wzgledem'])} "
-              f"| {e.get('zysk_proc', '—')}")
+              f"| {e.get('postep_proc', '-')}{'' if 'postep_wzgledem' not in e else ' vs ' + str(e['postep_wzgledem'])} "
+              f"| {e.get('zysk_proc', '-')}")
     if egz:
         e = egz[-1]
         if e["proc"] < 45 and e["wygrane"] + e["przegrane"] + e["remisy"] >= 100:
-            ostrzezenia.append(f"fists: {e['proc']}% vs the reference version — forgetting")
+            ostrzezenia.append(f"fists: {e['proc']}% vs the reference version - forgetting")
         if time.time() - e["czas"] > 40 * 60:          # exam cycle ~10 min + 15 min break
             ostrzezenia.append(f"last exam {(time.time() - e['czas']) / 60:.0f} min ago")
 

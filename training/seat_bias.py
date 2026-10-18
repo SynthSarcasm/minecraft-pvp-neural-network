@@ -1,8 +1,5 @@
-"""Seat-bias check: the identical bot v2 in both positions of a 1v1 arena — who wins more often, player 0 or 1?
+"""Seat-bias check: bot v2 against itself in 1v1 arenas, results per seat (player 0 / 1). Fair setups give ~50%.
 
-Counts separately for player 0 and 1 of the arena: kills, wins on points, damage, hits, attacks (with / without the
-crosshair on target), how often the crosshair is on the opponent. Flat, no ping. A fair setup gives ~50:50 (measured:
-49.8–50.6%); the bias seen earlier came from pvp-bot restoring fake players in creative mode, which the mod now resets.
   python seat_bias.py --port 25604 --areny 16 --sekundy 120 [--bron 0]
 """
 import argparse
@@ -43,7 +40,7 @@ def main():
         _, po = m.obserwacje()
         ticki += 1
         w = sed.krok(obs, po)
-        gra = ~w["swieze"][u.klatka]                     # players in an ongoing round (the decision from obs counts)
+        gra = ~w["swieze"][u.klatka]
         cios = idx[:, 3] > 0
         cel = obs[:, M.CELUJE] > 0.5
         traf = w["zadane"] > 0

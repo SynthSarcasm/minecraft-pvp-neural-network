@@ -1,8 +1,4 @@
-"""Do lava and potions work as they should (show server, port 25600, flat, diamond armor).
-
-Arena 0: A hits a standing B down to HP < 10, then B throws a healing II potion at its feet — how much HP B regained, and A (standing next to it).
-Arena 1: A walks up and pours lava under the feet of a standing B (B in armor) — B's HP and fire over 15 s (B leaves the lava after 2 s).
-Arena 2: A throws a harming II potion (kind 7) at B from 3 blocks — B's HP.
+"""Check healing, lava and harming potions on the show server: arena 0 healing, arena 1 lava, arena 2 harming II.
 
   python test_mechanics.py
 """
@@ -67,7 +63,7 @@ def main():
                 elif faza[a] >= 1:
                     idx[A] = [4, 0, 0, 0, 0, 7, 4, 0, 2]
                     if a == 1 and 40 < t_fazy[a] < 70:
-                        idx[B, 0] = 7                     # B walks out of the lava (forward)
+                        idx[B, 0] = 7                     # B walks out of the lava
                     if t_fazy[a] in (1, 5, 10, 20, 40, 80, 150, 300):
                         log[a].append((t_fazy[a], float(obs[B, M.HP]), float(obs[B, M.OGIEN_T]), float(obs[B, M.W_LAWIE]),
                                        float(obs[A, M.WIADRO]), float(obs[A, M.MIKSTURA_ILE]), float(obs[A, M.TRZYMA]), float(obs[A, M.MIKSTURA])))

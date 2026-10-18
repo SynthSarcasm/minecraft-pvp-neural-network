@@ -5,18 +5,18 @@ steps in total). Everything below is measured; where something is a hypothesis i
 
 Win rates are "% of rounds won" (draws count as not won). "vs pre-stage" = against the same network from before stage 6
 (it knows weapons, armor, ping and the stage-5 items, but not terrain, lava, potions or 1v3). 120 s per test,
-~150–400 rounds per cell; single short tests have roughly ±8 points of noise.
+~150-400 rounds per cell; single short tests have roughly ±8 points of noise.
 
 ## What it can do
 
 | Test | Result |
 |---|---|
 | 1v1 vs **pvp-bot-fabric** (rule-based PvP bot from GitHub, full loadout, terrain) | **93.5%** |
-| **1v3** vs pvp-bot-fabric, everyone with the full loadout | **42.5–56.8%** wins; takes down all three in up to 33.5% of rounds |
-| 1v3 vs pvp-bot-fabric, enemies with weapon + shield + food + healing | 11–23% |
+| **1v3** vs pvp-bot-fabric, everyone with the full loadout | **42.5-56.8%** wins; takes down all three in up to 33.5% of rounds |
+| 1v3 vs pvp-bot-fabric, enemies with weapon + shield + food + healing | 11-23% |
 | 1v1 on terrain, full loadout, vs pre-stage | 60.9% |
 | weapons only on terrain, vs pre-stage | 69.3% |
-| fists vs the fists champion (does it forget?) | 83.0% — no forgetting |
+| fists vs the fists champion (does it forget?) | 83.0% - no forgetting |
 
 The 1v3 range comes from the same version on two servers (56.8% on server 1, 42.5% on server 3). A likely cause, found
 afterwards: pvp-bot restores "its" bots after a server restart in creative mode (reach 5 instead of 3), which makes
@@ -37,22 +37,22 @@ Per-item tests: weapon + only that item, vs the pre-stage network (which has the
 | fists + healing | 68.8% | 0.18 |
 | fists + offensive potion | 58.6% | 0.19 |
 | fists + lava | 61.7% | 0.08 |
-| fists, no items | 64.1% | — |
+| fists, no items | 64.1% | - |
 
 Read against the "weapons only" baseline (69.3%) and the "fists" baseline (64.1%):
 
-- **Healing**: used, a small gain (+4–5 points). Partially learned.
+- **Healing**: used, a small gain (+4-5 points). Partially learned.
 - **Offensive / buff potions and lava**: rarely used, no measurable gain. Not learned.
-- **Fishing rod**: never used — and correctly so: in 26.3 the rod only pulls (no damage, no knockback) and in teacher
+- **Fishing rod**: never used - and correctly so: in 26.3 the rod only pulls (no damage, no knockback) and in teacher
   experiments it *lowered* the win rate (34.5% vs 45.5%).
 - From stage 5 (still in the champion): **bow with fists** and **shield with a weapon** are clearly learned
   (88% and 95% vs the network before items, at that stage).
 
-Why items are hard (measured with a scripted teacher): the items are strong (healing II +8 HP, harming II −12 HP, lava
-~−10 HP in 7.5 s against diamond armor), but used up close they hurt the user too — a splash potion thrown from < 4 blocks
+Why items are hard (measured with a scripted teacher): the items are strong (healing II +8 HP, harming II -12 HP, lava
+~-10 HP in 7.5 s against diamond armor), but used up close they hurt the user too - a splash potion thrown from < 4 blocks
 hits the thrower, lava spreads ~3 blocks and burned the pourer in 66% of uses. A teacher using them up close gained
-nothing; from 4+ blocks it gained 8–9 points. The network learns *to reach for* an item quickly, but *when* to use it
-slowly — rewarding use directly made it spam items up close and get weaker.
+nothing; from 4+ blocks it gained 8-9 points. The network learns *to reach for* an item quickly, but *when* to use it
+slowly - rewarding use directly made it spam items up close and get weaker.
 
 ## Full final evaluation of the stage-6 candidates
 
@@ -81,7 +81,7 @@ v21080 was weak at the start of the stage because it randomly switched to the ne
 ## Playing through a real Minecraft client (assistant)
 
 The champion driving a real client (pvppilot mod) against bot v2 (no ping), flat arena, axe vs axe, full loadout,
-~7 minutes per condition (± is the 95% interval, roughly ±8–18 points):
+~7 minutes per condition (± is the 95% interval, roughly ±8-18 points):
 
 | Condition | Rounds | Wins | Damage dealt / taken per round |
 |---|---|---|---|
@@ -100,8 +100,8 @@ The champion driving a real client (pvppilot mod) against bot v2 (no ping), flat
 
 - **Humans**: never measured. No games against human players were part of training or evaluation.
 - **Anticheats**: not tested; the turning and clicking patterns are not designed to look human.
-- **Unknown worlds**: trained only in a 23×23 arena with gentle hills, pits and lava — no water, ladders, cliffs,
+- **Unknown worlds**: trained only in a 23×23 arena with gentle hills, pits and lava - no water, ladders, cliffs,
   buildings or crowds of players. On such terrain it may behave badly (hypothesis).
 - **Ping above 200 ms**: never trained.
-- **Strong 1v3**: against three enemies with shields and healing it wins only 11–23%.
+- **Strong 1v3**: against three enemies with shields and healing it wins only 11-23%.
 - **Items beyond bow, shield and (partly) healing**: see above.

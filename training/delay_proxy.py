@@ -1,6 +1,6 @@
-"""Artificial ping for tests: a TCP proxy that delays each direction by --ms milliseconds (ping ≈ 2 × ms).
+"""TCP proxy that adds --ms of delay in each direction (ping ~ 2 x ms).
 
-    .venv/bin/python -u delay_proxy.py --z 25590 --do 25568 --ms 100     # the client connects to 127.0.0.1:25590
+  .venv/bin/python -u delay_proxy.py --z 25590 --do 25568 --ms 100
 """
 import argparse
 import asyncio

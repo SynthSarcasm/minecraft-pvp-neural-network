@@ -1,11 +1,5 @@
-"""Live WebSocket feed of the show (port 8771) used by the dashboard, plus an optional (experimental) browser gamepad mode.
-
-HTTP  :8770  -> files from pad_web/ (gamepad page; not shipped in this repository — the show runs with port_http=None)
-WS    :8771  -> the show broadcasts the fight state every tick; with control enabled a browser can send gamepad input.
-
-Browser input is turned into EXACTLY the same actions as the network's (3x3 movement, jump, sprint,
-attack, sneak, turns from the YAW_PROGI/PITCH_PROGI steps) — so a recording of human play is a ready
-imitation lesson, no guessing.
+"""WebSocket feed of the show on port 8771 (the dashboard's live view). Optionally serves a gamepad page and
+turns browser input into the network's discrete actions; the show runs it with control disabled.
 """
 import asyncio
 import json

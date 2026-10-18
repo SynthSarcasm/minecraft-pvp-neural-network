@@ -1,7 +1,5 @@
-"""Large PPO network: input normalization, input layer, residual blocks with LayerNorm, two heads.
-
-Residual block: x + W2(ReLU(W1(LN(x)))); the last layer of each block starts at zero, so initially
-every block passes the signal through unchanged — large networks train more stably this way.
+"""Policy/value network: input normalization, Linear to 2048, residual blocks x + W2(ReLU(W1(LN(x)))) with W2
+initialised to zero, and two heads. Also helpers to grow an older checkpoint to the current input and heads.
 """
 import torch
 import torch.nn as nn
@@ -55,7 +53,7 @@ class Siec(nn.Module):
         nn.init.zeros_(self.polityka.bias)
 
     def ukryte(self, x):
-        """Last hidden layer (2048 neurons) — both heads read from it."""
+        """Last hidden layer (2048 neurons) - both heads read from it."""
         h = F.relu(self.wejscie(self.norm(x)))
         for b in self.bloki:
             h = b(h)
@@ -106,7 +104,7 @@ def _dopisz_glowy(stan, glowy, bias_nowych):
 
 
 def wstaw_sloty(stan, bias_slotow):
-    """Stage 5 -> 6: the slot head grows from 7 (no change + slots 0–5) to 10 (+ slots 6–8: lava, healing, potion).
+    """Stage 5 -> 6: the slot head grows from 7 (no change + slots 0-5) to 10 (+ slots 6-8: lava, healing, potion).
     New policy rows are inserted after the old rows of that head: zero weights, bias `bias_slotow` (a number or a list of 3)."""
     from features import GLOWY_ETAP5
     w, b = stan["polityka.weight"], stan["polityka.bias"]
@@ -121,8 +119,8 @@ def wstaw_sloty(stan, bias_slotow):
 
 
 def dopasuj_wyjscie(stan, glowy, bias_nowych):
-    """Older checkpoint -> current action heads. Stages 1–4 (no slot and right-button heads): heads 7–8 appended with a "never" bias;
-    stage 5 (slots 0–5): slots 6–8 inserted with a "never" bias — old versions play exactly as in their own stage."""
+    """Older checkpoint -> current action heads. Stages 1-4 (no slot and right-button heads): heads 7-8 appended with a "never" bias;
+    stage 5 (slots 0-5): slots 6-8 inserted with a "never" bias - old versions play exactly as in their own stage."""
     from features import BIAS_NOWYCH_SLOTOW, GLOWY_ETAP5
     jest = stan["polityka.weight"].shape[0]
     if jest == sum(glowy):

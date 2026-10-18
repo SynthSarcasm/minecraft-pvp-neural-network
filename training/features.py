@@ -1,14 +1,8 @@
-"""What the network sees and how it controls the player.
+"""Network input, action heads and round rules.
 
-Observation: raw numbers from the mod (bridge.RAW per player) turned into features from the bot's point of view
-(opponent "2 blocks ahead of me, a bit to the right" rather than world coordinates), stacked over the last 4 ticks.
-
-Action: 9 choice heads — movement (9 combinations of forward/back × left/right), jump, sprint, attack, sneak,
-horizontal turn (15 steps) and vertical turn (9 steps), hotbar slot (0 = no change, 1–9), right button.
-
-Stage 6: 1v1 arenas (players 2a, 2a+1) and 1v3 arenas (player 0 of the arena vs 1–3) — layout in class Uklad. A player's
-"opponent" is its current target (Sedzia.cel): in 1v1 the other player, in 1v3 the network targets the nearest living
-enemy and the enemies target the network.
+Features are relative to the player (opponent "2 blocks ahead, a bit to the right"), stacked over 4 ticks. Actions come
+from 9 heads: movement, jump, sprint, attack, sneak, yaw step, pitch step, hotbar slot, right button. Arenas are 1v1
+(players 2a, 2a+1) or 1v3 (player 0 vs 1-3, layout in Uklad); a player's opponent is its current target (Sedzia.cel).
 """
 import numpy as np
 from bridge import (ABSORPCJA, BLOKI, BLOKUJE, BRON, CELUJE, EFEKT, HAK, HP, HURT, JABLKA, JEDZENIE, KUCA, LECZENIE, MAPA_H,
@@ -24,14 +18,13 @@ MAX_EPIZOD_MULTI = 1800     # 1v3: 90 s
 RUCH = np.array([(p, b) for p in (-1, 0, 1) for b in (-1, 0, 1)], dtype=np.float32)
 YAW_PROGI = np.array([-45, -30, -20, -12, -6, -3, -1, 0, 1, 3, 6, 12, 20, 30, 45], dtype=np.float32)
 PITCH_PROGI = np.array([-20, -10, -5, -2, 0, 2, 5, 10, 20], dtype=np.float32)
-# movement, jump, sprint, attack, sneak, yaw, pitch, slot (0 = no change, 1–9 = slot 0–8), right button (0 keep as is,
-# 1 press, 2 release — holding happens by itself, so random exploration can discover drawing a bow and eating for 32 ticks)
+# movement, jump, sprint, attack, sneak, yaw, pitch, slot (0 = no change, 1-9 = slot 0-8), right button (0 keep as is,
+# 1 press, 2 release - holding happens by itself, so random exploration can discover drawing a bow and eating for 32 ticks)
 GLOWY = [len(RUCH), 2, 2, 2, 2, len(YAW_PROGI), len(PITCH_PROGI), 10, 3]
-GLOWY_ETAP5 = [len(RUCH), 2, 2, 2, 2, len(YAW_PROGI), len(PITCH_PROGI), 7, 3]   # slots 0–5 (for loading older checkpoints)
-# older versions (pool, exams) without these heads NEVER change the slot or press the right button — they play as before the stage
-# (with a "sometimes switch" bias old versions randomly pulled out an apple / fishing rod and exams reported a false 100%)
+GLOWY_ETAP5 = [len(RUCH), 2, 2, 2, 2, len(YAW_PROGI), len(PITCH_PROGI), 7, 3]   # slots 0-5 (for loading older checkpoints)
+# checkpoints without these heads get a -30 bias: they never switch slots or press the right button
 BIAS_NOWYCH_GLOW = {7: [0.0] + [-30.0] * 9, 8: [0.0, -30.0, -30.0]}
-BIAS_NOWYCH_SLOTOW = -30.0  # stage-5 versions do not know slots 6–8 (lava, healing, potion) — they never pick them
+BIAS_NOWYCH_SLOTOW = -30.0  # stage-5 checkpoints never pick slots 6-8
 
 
 def _obroc(dx, dz, s, c):
@@ -41,7 +34,7 @@ def _obroc(dx, dz, s, c):
 
 
 class Uklad:
-    """Arenas and players: first n2 1v1 arenas (2 players each), then n4 1v3 arenas (4 players: 0 = network, 1–3 enemies)."""
+    """Arenas and players: first n2 1v1 arenas (2 players each), then n4 1v3 arenas (4 players: 0 = network, 1-3 enemies)."""
 
     def __init__(self, n_aren, n4=0):
         self.nA, self.n4, self.n2 = n_aren, n4, n_aren - n4
@@ -52,18 +45,18 @@ class Uklad:
         self.k = np.arange(self.n) - self.pocz[self.klatka]
         self.multi = self.ile == 4
         self.multi_g = self.multi[self.klatka]
-        self.siec_multi = self.multi_g & (self.k == 0)          # player 0 of a 1v3 arena (the network)
+        self.siec_multi = self.multi_g & (self.k == 0)
         self.wrog_multi = self.multi_g & (self.k > 0)
         p = self.pocz[self.klatka]
         # default target: in 1v1 the other player (i ^ 1), in 1v3 network -> first enemy, enemies -> network
         self.cel0 = np.where(self.multi_g, np.where(self.k == 0, p + 1, p), p + 1 - self.k)
-        self.pierwszy = self.pocz                                 # player 0 of every arena ("ours" in statistics)
+        self.pierwszy = self.pocz
 
 
 def cechy_ticku(obs, t_epizodu, on, celuje=None, hp_on=None):
-    """obs [n, RAW] -> [n, N_CECH]; on: [n, RAW] — how player i sees its target (delayed by ping).
-    celuje: [n] — whether the crosshair is on the opponent (with lag: on the one that is seen); default: the mod's flag.
-    hp_on: [n] — opponent HP as the player knows it (20 minus its losses this round); default: the true value."""
+    """obs [n, RAW] -> [n, N_CECH]; on: [n, RAW] - how player i sees its target (delayed by ping).
+    celuje: [n] - whether the crosshair is on the opponent (with lag: on the one that is seen); default: the mod's flag.
+    hp_on: [n] - opponent HP as the player knows it (20 minus its losses this round); default: the true value."""
     ja = obs
     yaw = np.radians(ja[:, YAW])
     s, c = np.sin(yaw), np.cos(yaw)
@@ -99,8 +92,8 @@ def cechy_ticku(obs, t_epizodu, on, celuje=None, hp_on=None):
 
 N_CECH = 41
 DODATKI_BRONI = 7           # outside the stack: round balance (/20) + my weapon (3) + opponent weapon (3), one-hot
-MAX_LAG_AKCJI = 2           # ticks: an action reaches the server after 0–2 ticks (ping up to ~200 ms)
-MAX_LAG_WIDOKU = 3          # ticks: opponent seen as it was 0–3 ticks ago (ping + client-side movement smoothing)
+MAX_LAG_AKCJI = 2           # ticks: an action reaches the server after 0-2 ticks (ping up to ~200 ms)
+MAX_LAG_WIDOKU = 3          # ticks: opponent seen as it was 0-3 ticks ago (ping + client-side movement smoothing)
 DODATKI_LAGU = MAX_LAG_AKCJI * 8 + 2   # actions sent but not yet executed (up to 2 × 8) + both delays
 N_VOX = 75                  # blocks around the player (3 levels × 5 × 5, in the player's frame)
 DODATKI_PRZEDMIOTOW = 34 + 25 + N_VOX + 4   # my items, opponent's visible items, blocks, slot/right button in flight (lag)
@@ -113,15 +106,13 @@ WEJSCIE_ETAP5 = 327
 # input columns "in hand: lava bucket / empty bucket / splash potion / drinkable potion" (cechy_etapu6 -> _nowe_kategorie)
 KOL_W_RECE = WEJSCIE_ETAP5 + 3 + 1 + 11 + 1 + 2 * N_EFEKTOW + 3 + 2 * N_MAPA
 BRONIE = ["fists", "sword", "axe"]
-# stage 2: loadouts (weapon of player 2a, weapon of player 2a+1) and their per-round probabilities
+# stage 2: ((weapon of player 2a, weapon of 2a+1), probability)
 ZESTAWY_ETAP2 = [((1, 2), 0.2), ((2, 1), 0.2), ((1, 1), 0.25), ((2, 2), 0.25), ((0, 0), 0.1)]
-# stage 3: same weapons, but with a weapon the mod adds full diamond armor (fists without armor); more fists against forgetting
+# stage 3: same, more fists rounds against forgetting (the mod adds armor to weapons)
 ZESTAWY_ETAP3 = [((1, 2), 0.2), ((2, 1), 0.2), ((1, 1), 0.225), ((2, 2), 0.225), ((0, 0), 0.15)]
-# stage 5: items (mask as in the mod: 1 bow, 2 food, 4 shield, 8 fishing rod, 16 blocks), symmetric for both players;
-# armored weapons drawn uniformly; fists and weapons-only rounds stay to prevent forgetting
+# stage 5: item masks as in the mod (1 bow, 2 food, 4 shield, 8 rod, 16 blocks), same for both players
 _BRONIE4 = [(1, 2), (2, 1), (1, 1), (2, 2)]
-# + fists with a bow / fishing rod: there the item is the only sensible weapon, so its value is unambiguous
-# (with armored weapons, randomly pulling out a bow in melee only hurts, and item exploration died out)
+# fists + bow / rod rounds: there the item is the only sensible weapon, so its value is easy to learn
 ZESTAWY_ETAP5 = ([((0, 0), 0, 0.08), ((0, 0), 1, 0.10), ((0, 0), 8, 0.03)] + [(b, 0, 0.16 / 4) for b in _BRONIE4] +
                  [(b, m, w / 4) for m, w in ((4, 0.10), (1, 0.10), (2, 0.10), (8, 0.06), (16, 0.07), (31, 0.20)) for b in _BRONIE4])
 # stage 6: + 32 lava bucket, 64 healing potions, 128 potion in slot 8 (kind drawn every round, same for both)
@@ -133,12 +124,9 @@ ZESTAWY_ETAP6 = ([((0, 0), 0, 0.03), ((0, 0), 1, 0.02), ((0, 0), 8, 0.02), ((0, 
                  [(b, 0, 0.06 / 4) for b in _BRONIE4] +
                  [(b, m, w / 4) for m, w in ((4, 0.04), (1, 0.03), (2, 0.02), (8, 0.04), (16, 0.02), (32, 0.07),
                                              (64, 0.06), (128, 0.09), (4 | 64, 0.04), (PELNY, 0.24)) for b in _BRONIE4])
-# more "fists + lava / healing / offensive splash potion" rounds: without armor the item is the main weapon
-# (harming II = -12 HP, lava kills, healing +8 HP), so its value is unambiguous — without them the network almost
-# stopped using the new items (like the bow in stage 5, fixed with fists + bow rounds)
+# extra fists + lava / healing / offensive potion rounds: without armor the item decides the fight
 # 1v3: (network weapon, enemy weapon, network mask, enemy mask, probability); weapon 1/2 drawn per player (0 = random)
 ZESTAWY_MULTI = [(0, 0, PELNY, PELNY, 0.35), (0, 0, PELNY, 4 | 2 | 64, 0.4), (0, 0, PELNY, 0, 0.25)]
-# more enemies with weapon+shield+food+healing: these are the hardest 1v3 opponents
 ROZKLAD_BOTOW = (0.25, 0.35, 0.40)      # probability of 1, 2, 3 active enemies in a 1v3 arena
 N_MIKSTUR = 10
 
@@ -204,7 +192,7 @@ def cechy_etapu6(obs, on, sedzia, widok):
         S = np.where(u.siec_multi)[0]
         multi[S, 0] = 1
         zywi = sedzia.zywi
-        E = u.pocz[u.klatka[S]][:, None] + np.arange(1, 4)[None, :]      # enemies of every 1v3 network player
+        E = u.pocz[u.klatka[S]][:, None] + np.arange(1, 4)[None, :]
         zyw = zywi[E]
         multi[S, 1] = zyw.sum(1) / 3
         d = np.linalg.norm(obs[E][:, :, [X, Y, Z]] - obs[S][:, None, [X, Y, Z]], axis=2)
@@ -265,7 +253,7 @@ ZASIEG = 3.0                # player's entityInteractionRange
 
 def celownik(ja, on, yaw, pitch):
     """Whether a ray from the player's eye (position from `ja`, yaw/pitch in degrees) hits the hitbox of `on` within 3 blocks
-    — like the client raycast in MC. Player hitbox 0.6 × 1.8 (sneaking 1.5), eye 1.62 (sneaking 1.27). Blocks are not checked
+    - like the client raycast in MC. Player hitbox 0.6 × 1.8 (sneaking 1.5), eye 1.62 (sneaking 1.27). Blocks are not checked
     (the server checks terrain occlusion for attack code 2)."""
     oko = np.stack([ja[:, X], ja[:, Y] + np.where(ja[:, KUCA] > 0.5, 1.27, 1.62), ja[:, Z]], 1)
     y, p = np.radians(yaw), np.radians(pitch)
@@ -281,15 +269,9 @@ def celownik(ja, on, yaw, pitch):
 
 
 class Lag:
-    """Ping like a human playing over the internet (the "fair network" stage).
-
-    Every round each player draws a ping. An action chosen now reaches the server after `akc` ticks,
-    and the opponent is seen as it was `widok` ticks ago (the player sees itself up to date — the client predicts
-    its own movement). The network gets the actions "in flight" (already chosen, not yet executed) and both delays as
-    input — just as a human knows what they already pressed and knows their ping.
-    Distribution: 15% of rounds without lag (local play), the rest ping 0–200 ms: akc = round(ping/100) in {0,1,2},
-    widok = akc + 1 (the client smooths other players' movement by ~1 tick).
-    Players in the `wylacz` mask (e.g. bot v2) play without lag; `staly` = {player: (akc, widok)} forces values.
+    """Internet-like ping. Every round each player draws a ping of 0-200 ms (15% of rounds have none):
+    actions arrive round(ping/100) ticks later and the opponent is seen widok = akc + 1 ticks old. The network gets
+    the actions still in flight and both delays as input. `wylacz` disables lag per player, `staly` forces values.
     """
 
     def __init__(self, n, rng, bez_lagu=0.15):
@@ -318,13 +300,13 @@ class Lag:
         self.akc[self.wylacz], self.widok[self.wylacz] = 0, 0
 
     def widok_przeciwnika(self, obs, swiezi, cel):
-        """Store the current observation; return [n, RAW] — the target as each player sees it."""
+        """Store the current observation; return [n, RAW] - the target as each player sees it."""
         if self.hist_obs is None:
             self.hist_obs = np.repeat(obs[None], MAX_LAG_WIDOKU + 1, 0)
         else:
             self.hist_obs = np.roll(self.hist_obs, 1, 0)
             self.hist_obs[0] = obs
-            if swiezi.any():                                   # new round: no older frames from this round
+            if swiezi.any():
                 self.hist_obs[:, swiezi] = obs[swiezi]
         if swiezi.any():
             self.hist_akc[:, swiezi] = 0
@@ -341,7 +323,7 @@ class Lag:
         """[n, DODATKI_LAGU]: actions in flight (the one executed soonest first) + delays."""
         w = np.zeros((self.n, DODATKI_LAGU), np.float32)
         for j in range(MAX_LAG_AKCJI):                          # in flight are decisions [akc-1 .. 0] (0 = latest)
-            k = self.akc - 1 - j                                # j-th in execution order
+            k = self.akc - 1 - j
             ok = k >= 0
             a = self.hist_akc[k[ok], np.where(ok)[0]][:, :8]
             a[:, 4] = a[:, 4] > 0.5                             # attack: clicked / not (without the hit code)
@@ -364,7 +346,7 @@ class Lag:
     def akcje(self, akc):
         """Store this tick's decisions; return the actions that are arriving at the server right now.
 
-        Attack of a lagged player: the hit is decided by the "client" at the moment of the click — crosshair (current angles
+        Attack of a lagged player: the hit is decided by the "client" at the moment of the click - crosshair (current angles
         plus turns still in flight and this tick's turn) on the opponent as the player sees it. Code for the mod: 2 = hit,
         3 = miss (the server then only checks range and terrain occlusion, like an anticheat with ping tolerance). Without lag it stays 1."""
         akc = akc.copy()
@@ -372,7 +354,7 @@ class Lag:
         klik = (akc[:, 4] > 0.5) & z_lagiem
         if klik.any():
             ja = self.hist_obs[0]
-            w_drodze = np.arange(MAX_LAG_AKCJI + 1)[:, None] < self.akc[None, :]   # decisions not yet executed
+            w_drodze = np.arange(MAX_LAG_AKCJI + 1)[:, None] < self.akc[None, :]
             yaw = ja[:, YAW] + (self.hist_akc[:, :, 5] * w_drodze).sum(0) + akc[:, 5]
             pitch = np.clip(ja[:, PITCH] + (self.hist_akc[:, :, 6] * w_drodze).sum(0) + akc[:, 6], -90, 90)
             traf = celownik(ja, self.widziany, yaw, pitch)
@@ -407,7 +389,7 @@ def akcje_z_indeksow(idx):
     a = np.zeros((n, 10), dtype=np.float32)
     a[:, 0:2] = RUCH[idx[:, 0]]
     if idx.shape[1] > 7:
-        a[:, 8] = idx[:, 7]                       # slot: 0 no change, 1–9
+        a[:, 8] = idx[:, 7]                       # slot: 0 no change, 1-9
         a[:, 9] = idx[:, 8]                       # right: 0 keep as is, 1 press, 2 release (Sedzia.akcje -> 0/1)
     a[:, 2] = idx[:, 1]
     a[:, 3] = idx[:, 2]
@@ -419,15 +401,11 @@ def akcje_z_indeksow(idx):
 
 
 class Sedzia:
-    """Round rules in one place (training, imitation, the show and exams all compute them the same way).
+    """Round rules and rewards, shared by training, imitation, the show and the exams.
 
-    1v1: a round ends with a death or after MAX_EPIZOD ticks. Without a kill the damage balance decides
-    (dealt minus taken over the whole round), like in boxing:
-      kill +1 > win on points +0.5 > draw -kara_remis > loss on points -0.75 > death -1.
-    1v3 (player 0 = network): +0.5 for every enemy taken down, +0.5 for taking down all of them, -1 for its own death;
-    end: network death, no living enemies or MAX_EPIZOD_MULTI (then the balance decides as in 1v1).
-    On top of that, every tick 0.05 per point of damage dealt minus taken.
-    The observation in which a round ended is "garbage": its actions are not used, and the mod resets the arena.
+    1v1: ends with a death or after MAX_EPIZOD ticks; terminal reward kill +1 > win on points +0.5 > draw -kara_remis >
+    loss on points -0.75 > death -1 (points = damage balance). 1v3: +0.5 per enemy down, +0.5 for all of them, -1 for
+    dying. Every tick: 0.05 x (damage dealt - damage taken). The observation that ends a round is not used.
     """
 
     def __init__(self, n_aren, kara_remis=0.5, nagroda_pkt=0.5, kara_pkt=0.75, prog_pkt=2.0, zestawy=None, rng=None,
@@ -435,10 +413,10 @@ class Sedzia:
                  start_przedmiot=0.0):
         """zestawy: list of ((weapon A, weapon B), [mask,] probability) for 1v1 arenas; None = fists only.
         zestawy_multi: list of (network weapon, enemy weapon, network mask, enemy mask, probability) for 1v3 arenas (weapon 0 = random).
-        teren: (probability of a flat round, probability of new random terrain) — remaining rounds reuse the terrain; None = flat.
-        aktywne: [n_aren] bool — inactive arenas stay empty (all players out of play).
+        teren: (probability of a flat round, probability of new random terrain) - remaining rounds reuse the terrain; None = flat.
+        aktywne: [n_aren] bool - inactive arenas stay empty (all players out of play).
         start_przedmiot: in this fraction of 1v1 rounds with lava / healing / offensive potion both start with that item in hand
-        (healing: also with 10 HP) — a single click shows what the item does (instead of a random slot+aim+throw sequence).
+        (healing: also with 10 HP) - a single click shows what the item does (instead of a random slot+aim+throw sequence).
         lag: internet-like ping (class Lag); then send actions through sedzia.akcje(...)."""
         self.u = u = Uklad(n_aren, n4)
         self.nA, self.n = n_aren, u.n
@@ -453,20 +431,19 @@ class Sedzia:
         self.nast_maska = np.zeros(self.n, np.uint8)
         self.nast_mikstura = np.zeros(self.n, np.uint8)
         self.kod_resetu = np.full(n_aren, 2 if teren else 3, np.uint8)
-        self.ile_botow = np.zeros(n_aren, np.int64)        # enemies in the next 1v3 round
-        self.ile_botow_runda = np.zeros(n_aren, np.int64)  # enemies in the current round
+        self.ile_botow = np.zeros(n_aren, np.int64)
+        self.ile_botow_runda = np.zeros(n_aren, np.int64)
         self.straty = np.zeros(self.n, np.float32)         # player's HP losses this round (others estimate its HP from them)
-        self.prawy = np.zeros(self.n, np.float32)          # whether I hold the right button (state after decisions)
+        self.prawy = np.zeros(self.n, np.float32)
         self.cel = u.cel0.copy()
         self.zywi = np.ones(self.n, bool)
         self.kara_remis, self.nagroda_pkt, self.kara_pkt, self.prog_pkt = kara_remis, nagroda_pkt, kara_pkt, prog_pkt
         self.t_ep = np.zeros(n_aren, np.int64)
         self.max_ep = np.where(u.multi, MAX_EPIZOD_MULTI, MAX_EPIZOD)
         self.smiec = np.ones(n_aren, bool)            # reset right away: the first round already uses a drawn loadout
-        self.bilans = np.zeros(self.n, np.float32)    # dealt minus taken since the start of the round
+        self.bilans = np.zeros(self.n, np.float32)
         self._losuj(np.ones(n_aren, bool))
 
-    # ------------------------------------------------------------ loadouts for the next round
 
     def _losuj(self, klatki):
         u, r = self.u, self.rng
@@ -488,7 +465,7 @@ class Sedzia:
                 self.nast_maska[p0:p0 + 2] = m
                 rodzaje = z[3] if len(z) == 4 else range(1, N_MIKSTUR + 1)
                 rodzaj = int(r.choice(list(rodzaje))) if m & 128 else 0
-                bajt = rodzaj                              # bits 0–3 kind, 4–5 starting slot, bit 6 = start with 10 HP
+                bajt = rodzaj                              # bits 0-3 kind, 4-5 starting slot, bit 6 = start with 10 HP
                 if self.start_przedmiot and r.random() < self.start_przedmiot:
                     opcje = ([(1, 0)] if m & 32 else []) + ([(2, 64)] if m & 64 else []) + ([(3, 0)] if rodzaj >= 7 else [])
                     if opcje:
@@ -523,7 +500,7 @@ class Sedzia:
         return self.nast_mikstura
 
     def cele(self):
-        """Target index within the arena (0–3) for the mod."""
+        """Target index within the arena (0-3) for the mod."""
         return (self.cel - self.u.pocz[self.u.klatka]).astype(np.uint8)
 
     def resety(self):
@@ -534,11 +511,10 @@ class Sedzia:
         """Actions + everything the mod expects this tick."""
         most.akcje(akc, self.resety(), self.bronie(), self.przedmioty(), self.mikstury(), self.cele())
 
-    # ------------------------------------------------------------ krok
 
     def krok(self, obs_przed, obs_po):
         u = self.u
-        swieze = self.smiec.copy()                    # these arenas have just started a new round
+        swieze = self.smiec.copy()
         sg = swieze[u.klatka]
         self.ile_botow_runda[swieze] = self.ile_botow[swieze]
         self.t_ep[swieze] = 0
@@ -590,7 +566,7 @@ class Sedzia:
         drugi = p0[~u.multi] + 1
         a1 = ~u.multi
         dod[drugi] = (-self.kara_remis * remis + self.nagroda_pkt * wygral1 - self.kara_pkt * wygral0)[a1]
-        dod[p0] += 0.5 * (koniec & u.multi & wszyscy & ~smierc0)          # 1v3: took down everyone
+        dod[p0] += 0.5 * (koniec & u.multi & wszyscy & ~smierc0)
         wynik0[koniec & (wygral0 | (u.multi & wszyscy & ~smierc0) | (~u.multi & smierc1 & ~zginal[p0]))] = 1
         wynik0[koniec & (wygral1 | smierc0)] = -1
         self.smiec = koniec
@@ -599,7 +575,6 @@ class Sedzia:
                     remis=remis, na_punkty=wygral0 | wygral1, wynik0=wynik0, zabici=zab_multi,
                     czyste=koniec & u.multi & wszyscy & ~smierc0)
 
-    # ------------------------------------------------------------ network input
 
     def aktualizuj_cele(self, obs, swiezi):
         """1v3: the network targets the nearest living enemy (switching only when another one is closer by 1.5 blocks)."""
@@ -635,8 +610,7 @@ class Sedzia:
                            przedmioty=cechy_przedmiotow(obs, on, self.prawy),
                            etap6=cechy_etapu6(obs, on, self, lambda j: obs[j]))
         on = self.lag.widok_przeciwnika(obs, swiezi, self.cel)
-        # the mod's "aiming" flag uses the true opponent position — with lag that is knowledge the client does not have;
-        # compute it like the client, on the seen opponent (without lag the mod's flag stays; agreement 99.994%)
+        # with lag, recompute the aiming flag on the delayed opponent like a client would (the mod's flag uses the true position)
         celuje = np.where(self.lag.widok > 0, celownik(obs, on, obs[:, YAW], obs[:, PITCH]), obs[:, CELUJE])
         return wejscie(stos.dodaj(cechy_ticku(obs, t, on, celuje, hp_on)), self.bilans, obs, on,
                        self.lag.wejscie(), cechy_przedmiotow(obs, on, self.prawy, self.lag.w_drodze_przedmioty()),

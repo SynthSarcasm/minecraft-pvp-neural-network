@@ -60,7 +60,7 @@ template. The directories and their roles:
 | `server1/` | training server 1 | 25565 | 25599 | 25578 |
 | `server2/` | training server 2 | 25567 | 25602 | 25579 |
 | `server3/` | exams and tests | 25568 | 25603 | 25577 |
-| `server-show/` | the show: normal speed, humans can join | 25566 | 25600 | — |
+| `server-show/` | the show: normal speed, humans can join | 25566 | 25600 | - |
 
 You only need `server-show/` to watch and fight the network; training needs `server1/` and `server2/`, exams `server3/`.
 
@@ -73,8 +73,8 @@ For each server directory you want (example for `server-show`):
    ```
    Several servers can share `libraries/`, `versions/` and `fabric-server-launch.jar` through symlinks to one install.
 2. Put the mods into `server-show/mods/`:
-   - **Fabric API** `0.163.0+26.3` — <https://modrinth.com/mod/fabric-api>
-   - **Carpet** for 26.3 — <https://modrinth.com/mod/carpet>
+   - **Fabric API** `0.163.0+26.3` - <https://modrinth.com/mod/fabric-api>
+   - **Carpet** for 26.3 - <https://modrinth.com/mod/carpet>
    - our `mod/build/libs/pvpmost-0.1.0.jar`
    - training servers and `server3/` for stage-6 work also: `third_party/pvpbot26/build/libs/pvpbot26-0.0.15-pvp26.jar`
 3. `cp server-show/server.properties.template server-show/server.properties`. The template already contains what the mod
@@ -84,7 +84,7 @@ For each server directory you want (example for `server-show`):
    **and** write the same password into `rcon_haslo.txt` in that directory (the Python side reads it from there).
    RCON is only used to command pvp-bot in stage 6; otherwise you can set `enable-rcon=false`.
 4. Read the [Minecraft EULA](https://aka.ms/MinecraftEULA); if you agree: `echo eula=true > server-show/eula.txt`.
-5. Optional, show server only: a join password. `echo "your-password" > server-show/pvpmost_haslo.txt` — players then
+5. Optional, show server only: a join password. `echo "your-password" > server-show/pvpmost_haslo.txt` - players then
    have 30 s to type `/haslo your-password`, or they are disconnected. No file = no password.
 6. Start: `server-show/start.sh`. The server is ready when its log shows
    `pvpmost: waiting for Python on port 25600`. **Always start a server before the Python script that uses it.**
@@ -99,7 +99,7 @@ cd training
 
 - Join `127.0.0.1:25566` with a Minecraft 26.3 client. You start as a spectator above arena 0.
   Arena 0: network vs network; arena 1: network vs bot v2; arena 2: network vs bot v2, or vs **you**.
-- **`/walcz siekiera siekiera`** — you and the network both get an axe and the full loadout (armor, bow, shield, food,
+- **`/walcz siekiera siekiera`** - you and the network both get an axe and the full loadout (armor, bow, shield, food,
   lava, potions). Weapons: `piesci` = fists (no armor, no items), `miecz` = sword, `siekiera` = axe;
   `/walcz <yours> <network's>` gives different weapons; plain **`/walcz`** leaves the arena. Rounds last up to 60 s;
   the chat shows the result and your score. In the show the network plays with the delay of a local player.
@@ -109,7 +109,7 @@ cd training
   <http://127.0.0.1:8780>. The live arena view works with just the show; the training charts need a training log.
 - **Show for a friend over the internet**: `./show_for_friend.sh` starts the show server, `show.py` and a `bore`
   tunnel, and prints an address like `bore.pub:12345`. The friend adds it as a server (Minecraft 26.3) and uses `/walcz`.
-  Expect ~250–300 ms of extra latency through bore. Stop with `./stop_show.sh`.
+  Expect ~250-300 ms of extra latency through bore. Stop with `./stop_show.sh`.
 
 ## 7. The assistant in your own Minecraft client
 
@@ -133,16 +133,16 @@ automated play, so a server you run yourself (e.g. `pilot/test_server`, below) i
 2. Start Minecraft with that installation and join a server. The overlay in the top-left corner shows
    **"PvP network: OFF [R]"**.
 3. Keys (change them in Options → Controls → Key Binds → "PvP network"):
-   - **R** — network on/off. Off releases all keys immediately; you are in control.
-   - **V** — fight the suggested target (the nearest player within 12 m, shown as "Suggestion: Name 4.2 m") / stop the fight.
-   - **B** — next suggestion.
+   - **R** - network on/off. Off releases all keys immediately; you are in control.
+   - **V** - fight the suggested target (the nearest player within 12 m, shown as "Suggestion: Name 4.2 m") / stop the fight.
+   - **B** - next suggestion.
    - While the network is on and not fighting, a player who damages you automatically becomes the target.
    - During a fight the mouse does not turn the camera (the network aims). Opening chat or the inventory makes the
      network release the keys.
 4. The terminal prints every fight (time, damage dealt/taken); a line per fight is appended to `training/assistant_fights.csv`.
 
 Options of `assistant.py` (also accepted by `./assistant.command <options>`):
-`--surowo` (no camera smoothing and no calm mode — stronger, but the camera jumps), `--bez_spokoju` (smoothing without
+`--surowo` (no camera smoothing and no calm mode - stronger, but the camera jumps), `--bez_spokoju` (smoothing without
 calm mode), `--najpewniejsze` (no sampling), `--nagrywaj DIR` (record every fight to mp4 through ffmpeg),
 `--zrzut` (save observations/actions per fight), `--siec PATH` (another checkpoint).
 
@@ -181,35 +181,35 @@ Training writes to `training/runs/<run>/`: `log.csv`, `siec.pt` (full checkpoint
 A checkpoint for the next stage is created by copying `siec.pt` into the new run's directory: `train.py --wznow`
 appends new inputs/heads automatically.
 
-Honest note: the current code always builds the stage-6-sized network (508 inputs, 54 logits); earlier stages are
+Note: the current code always builds the stage-6-sized network (508 inputs, 54 logits); earlier stages are
 reproduced with flags. The released champion was trained incrementally with older versions of the code, so a rerun
 will not be identical. With the current mod, weapons always come with armor, so stages 2 and 3 are one stage.
 
 **Start servers 1 and 2** (`server1/start.sh`, `server2/start.sh`, each in its own terminal or in the background) and wait
 for `waiting for Python`. Then, from `training/`:
 
-**Stage 1 — fists.** Imitation of bot v2, then PPO self-play:
+**Stage 1 - fists.** Imitation of bot v2, then PPO self-play:
 ```bash
 .venv/bin/python -u imitate.py --nazwa pvp2          # ~25 min, uses server 1
 .venv/bin/python -u train.py --nazwa pvp2 --wznow --lr 5e-5 --entropia 0.001 --epoki 2 --porty 25599,25602 >> train_pvp2.log 2>&1
 ```
 
-**Stage 2–3 — sword and axe (with armor).** Copy the checkpoint, add weapon loadouts, help exploration of jump/sprint:
+**Stage 2-3 - sword and axe (with armor).** Copy the checkpoint, add weapon loadouts, help exploration of jump/sprint:
 ```bash
 mkdir -p runs/pvp3 && cp runs/pvp2/siec.pt runs/pvp3/ && cp runs/pvp2/siec_pokaz.pt runs/pvp3/przed_etapem.pt
 .venv/bin/python -u train.py --nazwa pvp3 --wznow --bronie --kara_remis 0.8 --ozyw_na_start --entropia_skok 0.01 --wygaszanie 1500 \
     --lr 5e-5 --entropia 0.001 --epoki 2 --porty 25599,25602 >> train_pvp3.log 2>&1
 ```
-(Originally the jump and sprint biases were also shifted so that each was picked ~5% of the time; without it they start
-near 0.001% and the entropy bonus alone barely moves them.)
+(The released run also shifted the jump and sprint biases to ~5% here; otherwise they start near 0.001% and the
+entropy bonus alone barely moves them.)
 
-**Stage 4 — ping and the fair input:**
+**Stage 4 - ping and the fair input:**
 ```bash
 mkdir -p runs/pvp5 && cp runs/pvp3/siec.pt runs/pvp5/ && cp runs/pvp3/siec_pokaz.pt runs/pvp5/przed_etapem.pt
 .venv/bin/python -u train.py --nazwa pvp5 --wznow --bronie --lag --kara_remis 0.8 --lr 5e-5 --entropia 0.001 --epoki 2 --porty 25599,25602 >> train_pvp5.log 2>&1
 ```
 
-**Stage 5 — bow, shield, food, fishing rod, blocks.** Teacher lessons for the slot and right-button heads (server 3 free):
+**Stage 5 - bow, shield, food, fishing rod, blocks.** Teacher lessons for the slot and right-button heads (server 3 free):
 ```bash
 .venv/bin/python -u collect_lessons.py --port 25603 --umie luk --bronie 0,0 --maska 1 --przedrostek lekcje_przedm --zwykle 0.05 --sekundy 300
 mkdir -p runs/pvp6 && cp runs/pvp5/siec.pt runs/pvp6/ && cp runs/pvp5/siec_pokaz.pt runs/pvp6/przed_etapem.pt
@@ -219,9 +219,9 @@ mkdir -p runs/pvp6 && cp runs/pvp5/siec.pt runs/pvp6/ && cp runs/pvp5/siec_pokaz
 (New heads are appended with a "never" bias; to let PPO discover them, their bias has to be raised to ~1% per slot,
 as `new_stage6.py` does for stage 6.)
 
-**Stage 6 — terrain, lava, potions, 1v3 vs pvp-bot.** Servers 1–2 need the pvp-bot jar and RCON (section 5).
+**Stage 6 - terrain, lava, potions, 1v3 vs pvp-bot.** Servers 1-2 need the pvp-bot jar and RCON (section 5).
 `new_stage6.py` builds the run from the end of stage 5 (it expects `pvp6/siec.pt`, `pvp6/mistrz_przedmiotow.pt` and
-`pvp6/pula_stala/s012150_ping.pt` for the fixed pool — edit those lines if your files differ):
+`pvp6/pula_stala/s012150_ping.pt` for the fixed pool - edit those lines if your files differ):
 ```bash
 .venv/bin/python -u new_stage6.py --z pvp6 --do pvp7
 .venv/bin/python -u collect_lessons.py --port 25603 --sekundy 600           # teacher lessons with lava/healing/potions -> lekcje6_*.npz
@@ -246,7 +246,7 @@ cp runs/pvp7/champion_stage6.pt runs/pvp8/przed_etapem.pt
 ```bash
 .venv/bin/python -u exam6.py --nazwa pvp7 --sekundy 60 --co_ile 30       # stage-6 exams -> runs/pvp7/egzamin6.json
 .venv/bin/python -u exam.py --nazwa pvp6 --lag --przedmioty --wzor runs/pvp6/przed_etapem.pt \
-    --wzor_etapu runs/pvp6/przed_etapem.pt --port 25603 --sekundy 240 --co_ile 900   # stage 1–5 style exams
+    --wzor_etapu runs/pvp6/przed_etapem.pt --port 25603 --sekundy 240 --co_ile 900   # stage 1-5 style exams
 .venv/bin/python -u watchdog.py --nazwa pvp6 --start <first update of the stage> --prog_zysku 60 --prog_bota 65 --prog_przedm 60
 .venv/bin/python -u panel.py --nazwa pvp7 --start <first update of the stage>         # http://127.0.0.1:8780
 .venv/bin/python health_check.py --nazwa pvp6 --poprzedni pvp5                            # one-off health report
@@ -276,16 +276,16 @@ pkill -f "bore local"; pkill -f "tournament.py"; pkill -f KnotClient
 sleep 3; pkill -f "fabric-server-launch.jar nogui"
 rm -f training/PAUZA
 ```
-A server stuck in lockstep (Python killed at a bad moment) may hang while closing; `kill -9` it — the arenas are rebuilt
+A server stuck in lockstep (Python killed at a bad moment) may hang while closing; `kill -9` it - the arenas are rebuilt
 on every start anyway.
 
 ## 11. Troubleshooting
 
-- **Python hangs on connect / "server closed the connection"**: the mod accepts one connection at a time — check that no
+- **Python hangs on connect / "server closed the connection"**: the mod accepts one connection at a time - check that no
   other script uses the same server (`lsof -iTCP:25599`).
 - **"still missing N bots"** in the server log: Carpet refused to spawn bots with names that were just removed; restart the server.
 - **Stage-6 servers hang at spawn after changing the arena layout**: pvp-bot restores its old bots from
-  `server*/config/pvpbot/worlds/*/bots.json` — delete that file and restart.
+  `server*/config/pvpbot/worlds/*/bots.json` - delete that file and restart.
 - **Training is paused**: the file `training/PAUZA` exists (created while a human fights in the show). Delete it if nobody is fighting.
 - **Cannot join the show**: 26.3 creates new servers with `white-list=true`; the template disables it.
 - **The project folder name contains "ć"**: quote paths in the shell.

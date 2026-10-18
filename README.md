@@ -1,13 +1,13 @@
 # Minecraft PvP neural network (Java 26.3, self-play PPO)
 
-A **26M-parameter neural network that learned Minecraft Java 26.3 PvP by playing against itself** — on real Minecraft
+A **26M-parameter neural network that learned Minecraft Java 26.3 PvP by playing against itself** - on real Minecraft
 servers, not in a simulator. A Fabric server mod builds arenas, spawns Carpet fake players and steps the game tick by
-tick in lockstep with Python (PyTorch). The network went through six curriculum stages — fists, sword and axe, armor,
-ping 0–200 ms with human-visible inputs only, items, and finally terrain, lava, potions and 1v3 fights — for ~510M
+tick in lockstep with Python (PyTorch). The network went through six curriculum stages - fists, sword and axe, armor,
+ping 0-200 ms with human-visible inputs only, items, and finally terrain, lava, potions and 1v3 fights - for ~510M
 steps on a single MacBook Pro. A client mod lets the trained network play through a real Minecraft client.
 
-Everything is here: the training code, both mods, a port of a third-party PvP bot used as an opponent, the dashboard,
-and the trained network (as a release download). Take it and build on it.
+Included: the training code, both mods, a port of a third-party PvP bot used as an opponent, the dashboard, and the
+trained network as a release download.
 
 ## What the released network can do
 
@@ -16,22 +16,22 @@ Stage-6 champion **v28785**, measured (details and everything it cannot do: [doc
 | Test | Win rate |
 |---|---|
 | 1v1 vs [pvp-bot-fabric](https://github.com/Stepan1411/pvp-bot-fabric) (rule-based bot), full loadout, terrain | **93.5%** |
-| 1v3 vs pvp-bot-fabric, everyone with the full loadout | **42.5–56.8%** |
-| 1v3 vs pvp-bot-fabric with weapon + shield + food + healing | 11–23% |
+| 1v3 vs pvp-bot-fabric, everyone with the full loadout | **42.5-56.8%** |
+| 1v3 vs pvp-bot-fabric with weapon + shield + food + healing | 11-23% |
 | vs itself from before stage 6, on terrain (full loadout / weapons only) | 60.9% / 69.3% |
 | through a real client, vs our rule-based bot (ping 0 / ~200 ms) | 94% / ~70% |
 
 Learned (measured): melee with sword, axe and fists, the shield, the bow when fighting with fists, fighting on uneven
 terrain, 1v1 and 1v3 against a rule-based bot, without forgetting earlier stages. Partly: healing potions. Not learned: offensive potions and
-lava (rarely used, no gain), fishing rod (never used — in 26.3 it only pulls). **Never tested against human players.**
+lava (rarely used, no gain), fishing rod (never used - in 26.3 it only pulls). **Never tested against human players.**
 
 ## How it works (short)
 
 - **Environment**: real Minecraft 26.3 servers with the `pvpmost` mod (`mod/`): 23×23 glass arenas with random terrain,
   Carpet fake players, 1v1 and 1v3 arenas, ~13k steps/s per server. The server waits for Python every tick, so lag never
   changes the physics.
-- **Fair input**: the network sees only what a player could infer from the screen — the opponent delayed by ping,
-  its HP estimated from the network's own hits, only visible items — 508 numbers, relative to the player.
+- **Fair input**: the network sees only what a player could infer from the screen - the opponent delayed by ping,
+  its HP estimated from the network's own hits, only visible items - 508 numbers, relative to the player.
 - **Network**: 508 → 2048 → 3 residual blocks → 9 action heads (movement, jump, sprint, attack, sneak, yaw, pitch,
   hotbar slot, right button) + value head; 26.3M parameters. New inputs and heads are appended with zero weights between
   stages, so nothing learned is lost.
@@ -49,11 +49,11 @@ Full description: [docs/design.md](docs/design.md).
 2. Build the mods: `cd mod && ./gradlew build`, `cd pilot && ./gradlew build` (with `JAVA_HOME` pointing to Java 25).
 3. Download `champion_stage6.pt` from **Releases** into `training/runs/pvp7/` (as `champion_stage6.pt` and `siec_pokaz.pt`).
 4. Set up a Fabric 26.3 server in `server-show/` with Fabric API, Carpet and `pvpmost`
-   (Minecraft and these mods are not redistributed here — download links in the setup guide).
+   (Minecraft and these mods are not redistributed here - download links in the setup guide).
 5. `server-show/start.sh`, then `cd training && .venv/bin/python -u show.py --nazwa pvp7 --z_losowaniem --lag --przedmioty --etap6`.
 6. Join `127.0.0.1:25566` with Minecraft 26.3 and type `/walcz siekiera siekiera` to fight the network.
 
-Step-by-step guide for everything — servers, watching and fighting, the dashboard, the assistant in your own client
+Step-by-step guide for everything - servers, watching and fighting, the dashboard, the assistant in your own client
 (keys **R** on/off, **V** fight, **B** next target), its auto-start, training every stage, exams:
 **[docs/setup.md](docs/setup.md)**.
 

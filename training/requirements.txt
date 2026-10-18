@@ -1,4 +1,4 @@
-# Python 3.12 (tested with 3.12.13 on macOS, Apple Silicon — PyTorch with MPS)
+# Python 3.12 (tested with 3.12.13 on macOS, Apple Silicon - PyTorch with MPS)
 # versions from the working environment; pip pulls torch's own dependencies (sympy, networkx, jinja2, ...) by itself
 torch==2.14.1
 numpy==2.5.4

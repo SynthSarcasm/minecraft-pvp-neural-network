@@ -70,19 +70,12 @@ import java.nio.file.Path;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import java.util.Set;
 
-/**
- * Bridge between the server and Python. Python connects over TCP (localhost:25599), sends the number of arenas, the
- * server tick rate and the number of 1v3 arenas, and then every tick: the mod sends the observations of all bots, Python
- * sends back actions. The server waits for the actions, so learning runs in lockstep with the game.
- *
- * Stage 6: an arena = a 23x23 glass cage with terrain (hills, pits, lava pools; or flat) holding 2 Carpet fake players
- * (1v1) or 4 (1v3: player 0 vs 1–3). The 1v3 arenas are at the end of the arena list.
- */
+/** Lockstep bridge to Python: builds arenas with Carpet fake players, sends all observations every tick and waits for the actions. Protocol: docs/design.md. */
 public class PvpBridge implements ModInitializer {
 	static final Logger LOG = LoggerFactory.getLogger("pvpmost");
 	static final int PORT = Integer.getInteger("pvpmost.port", 25599);   // -Dpvpmost.port=... for a second server
-	static final int RAW = 249;         // numbers per player in an observation (fields: see zapiszObs; 0–124 as in stage 5)
-	static final int ACT = 10;          // numbers per player in an action (8: slot choice 0=no change/1–9, 9: right button)
+	static final int RAW = 249;         // numbers per player in an observation (layout: zapiszObs)
+	static final int ACT = 10;          // numbers per player in an action
 	static final int VOX = 5;           // block grid around the player VOX×3×VOX in the player's frame (forward/right), levels -1..+1
 	static final int MAPA = 7;          // terrain map MAPA×MAPA around the player (surface height + lava)
 	// item set (bit mask, from Python every round): 1 bow+arrows, 2 food, 4 shield, 8 fishing rod, 16 blocks,
@@ -95,9 +88,9 @@ public class PvpBridge implements ModInitializer {
 	static int[] przerwaPrawego = new int[0], pudlo = new int[0];
 	static final int ROZSTAW = 48;      // spacing between arenas (larger than the players' view distance)
 	static final int W_RZEDZIE = 8;
-	static final int Y0 = 100;          // flat floor level
+	static final int Y0 = 100;
 	static final int POL = 11;          // interior from -11 to +11, i.e. 23 blocks
-	static final int WYS = 12;          // interior height above the flat floor
+	static final int WYS = 12;
 	static final int DNO = 4;           // how many blocks below the flat floor (pits)
 	static final int H_MIN = -3, H_MAX = 5;   // terrain height relative to the flat floor
 	static final float MAX_OBROT_YAW = 45f, MAX_OBROT_PITCH = 30f;   // degrees per tick
@@ -117,17 +110,17 @@ public class PvpBridge implements ModInitializer {
 	static int[] cel = new int[0];                // the opponent the player targets (player index; from Python every tick)
 	static boolean[] wypadl = new boolean[0];     // player out of the arena until the round ends (died in 1v3 or sits this round out)
 	static int[][] teren = new int[0][];          // terrain height of every column of the arena
-	static boolean[][] lawaT = new boolean[0][];  // lava pools in the terrain
+	static boolean[][] lawaT = new boolean[0][];
 	static ServerPlayer[] gracze = new ServerPlayer[0];
 	static boolean[] zginal = new boolean[0];
 	static boolean[] czlowiek = new boolean[0];   // slot taken by a real player (the /walcz command)
 	static int[] bron = new int[0];               // weapon this round: 0 fists, 1 diamond sword, 2 diamond axe
 	static int[] nastepnaBron = new int[0];       // weapon for the next round (Python sends it every tick, applied on reset)
-	static int[] maska = new int[0], nastepnaMaska = new int[0];   // item set this round / next round
-	static int[] mikstura = new int[0], nastepnaMikstura = new int[0];   // potion kind in slot 8
+	static int[] maska = new int[0], nastepnaMaska = new int[0];
+	static int[] mikstura = new int[0], nastepnaMikstura = new int[0];
 	static boolean[] wcisniety = new boolean[0];  // right button on the previous tick (rising edge = click)
 	static int[] trzyma = new int[0];             // how many ticks the right button is held (blocks: repeat every 4 ticks as in the game)
-	static int[] trafStrzala = new int[0], zablokowane = new int[0], postawione = new int[0];   // per-round counters
+	static int[] trafStrzala = new int[0], zablokowane = new int[0], postawione = new int[0];
 	static ServerPlayer zaparkowany = null;        // bot moved aside while a human fights
 	static int wygraneCz = 0, przegraneCz = 0, czasCz = 0;
 	static ByteBuffer buforObs, buforAkcji;
@@ -135,8 +128,8 @@ public class PvpBridge implements ModInitializer {
 	static float tempoGry = 20f;
 	static final String[] NAZWY_BRONI = {"piesci", "miecz", "siekiera"};
 	static int bronCz = 0, bronSieciCz = 0;            // weapons in the human's arena (chosen with /walcz)
-	static int maskaCz() { return bronCz > 0 || bronSieciCz > 0 ? 255 : 0; }   // with weapons: full loadout for both
-	// potions in slot 8 (kind 1–10): drinkable (strength II, speed II, fire resistance, regeneration II) and splash
+	static int maskaCz() { return bronCz > 0 || bronSieciCz > 0 ? 255 : 0; }
+	// potions in slot 8 (kind 1-10): drinkable (strength II, speed II, fire resistance, regeneration II) and splash
 	// (strength II, speed II on yourself; harming II, poison II, slowness, weakness on the opponent)
 	static final int N_MIKSTUR = 10;
 	static ItemStack zrobMiksture(int rodzaj) {
@@ -221,7 +214,6 @@ public class PvpBridge implements ModInitializer {
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, srv) -> {
 			ServerPlayer p = handler.player;
 			if (p instanceof EntityPlayerMPFake) return;
-			// a real player = spectator above the first arena
 			p.setGameMode(GameType.SPECTATOR);
 			p.getInventory().clearContent();
 			p.teleportTo(srv.overworld(), 0.5, Y0 + 10, -POL - 6.5, Set.of(), 0f, 35f, false);
@@ -268,7 +260,6 @@ public class PvpBridge implements ModInitializer {
 		LOG.info("pvpmost: waiting for Python on port {}", PORT);
 	}
 
-	// ---------------------------------------------------------------- arena and terrain
 
 	static int srodekX(int a) { return (a % W_RZEDZIE) * ROZSTAW; }
 	static int srodekZ(int a) { return (a / W_RZEDZIE) * ROZSTAW; }
@@ -288,7 +279,6 @@ public class PvpBridge implements ModInitializer {
 					if (dy == -DNO - 1) ustaw(lv, cx + dx, Y0 + dy, cz + dz, dno);
 					else if (dy == WYS + 1 || sciana) ustaw(lv, cx + dx, Y0 + dy, cz + dz, szklo);
 				}
-		// waiting room: a 3x3 glass box above the ceiling
 		int yp = Y0 + WYS + 3;
 		for (int dx = -2; dx <= 2; dx++)
 			for (int dz = -2; dz <= 2; dz++)
@@ -425,11 +415,9 @@ public class PvpBridge implements ModInitializer {
 				continue;
 			}
 			wypadl[i] = false;
-			// a fake player is always in survival: after a server restart pvp-bot restores "its" bots with
-			// /player … spawn without a game mode, and Carpet then gives creative mode — attack reach 5 instead of 3 (the
-			// crosshair catches the opponent 2× as often), nothing gets used up; such a bot won ~68% vs an identical one
+			// fake players must stay in survival: pvp-bot restores its bots after a restart in creative mode (reach 5 instead of 3)
 			if (!czlowiek[i] && p.gameMode.getGameModeForPlayer() != GameType.SURVIVAL) {
-				LOG.warn("pvpmost: {} was in {} mode — switching to survival", nazwa(i), p.gameMode.getGameModeForPlayer().getName());
+				LOG.warn("pvpmost: {} was in {} mode - switching to survival", nazwa(i), p.gameMode.getGameModeForPlayer().getName());
 				p.setGameMode(GameType.SURVIVAL);
 			}
 			p.getAbilities().invulnerable = false;
@@ -457,7 +445,7 @@ public class PvpBridge implements ModInitializer {
 			p.setRemainingFireTicks(0);
 			p.resetFallDistance();
 			if (p.isUsingItem()) p.stopUsingItem();
-			if (czlowiek[i]) {                         // human: weapon of their choice (/walcz)
+			if (czlowiek[i]) {
 				uzbroj(p, bronCz, maskaCz(), 1 + los.nextInt(N_MIKSTUR));
 				bron[i] = bronCz;
 				maska[i] = maskaCz();
@@ -465,7 +453,7 @@ public class PvpBridge implements ModInitializer {
 				((ServerPlayerInterface) p).getActionPack().stopAll();
 				int kodB = zCzlowiekiem ? bronSieciCz : nastepnaBron[i];   // network in the human's arena: weapon from /walcz
 				int m = zCzlowiekiem ? maskaCz() : nastepnaMaska[i];
-				// potion byte: bits 0–3 kind, 4–5 starting slot (0 weapon, 1 lava, 2 healing, 3 potion), bit 6 = start with 10 HP
+				// potion byte: bits 0-3 kind, 4-5 starting slot (0 weapon, 1 lava, 2 healing, 3 potion), bit 6 = start with 10 HP
 				int mk = zCzlowiekiem ? 1 + los.nextInt(N_MIKSTUR) : nastepnaMikstura[i];
 				int rodzaj = mk & 15, start = (mk >> 4) & 3;
 				uzbroj(p, kodB, m, rodzaj);
@@ -500,17 +488,16 @@ public class PvpBridge implements ModInitializer {
 		return true;
 	}
 
-	// ---------------------------------------------------------------- tick
 
 	static void poTicku(MinecraftServer srv) {
-		if (!czekajaNaHaslo.isEmpty() && srv.getTickCount() % 20 == 0) {   // no password after 30 s: disconnect
+		if (!czekajaNaHaslo.isEmpty() && srv.getTickCount() % 20 == 0) {
 			long teraz = System.currentTimeMillis();
 			for (var w : new ArrayList<>(czekajaNaHaslo.entrySet())) {
 				if (teraz - w.getValue() < 30_000) continue;
 				czekajaNaHaslo.remove(w.getKey());
 				ServerPlayer p = srv.getPlayerList().getPlayer(w.getKey());
 				if (p != null && !zweryfikowani.contains(w.getKey())) {
-					LOG.info("pvpmost: disconnecting {} — no password", p.getGameProfile().name());
+					LOG.info("pvpmost: disconnecting {} - no password", p.getGameProfile().name());
 					p.connection.disconnect(Component.literal("No password."));
 				}
 			}
@@ -566,7 +553,7 @@ public class PvpBridge implements ModInitializer {
 		// (Carpet rejects killing and immediately re-creating a bot with the same name)
 		for (ServerPlayer p : server.getPlayerList().getPlayers())
 			if (p instanceof EntityPlayerMPFake f && numerBota(p) >= N) f.kill(lv);
-		for (int i = 0; i < czlowiek.length; i++)        // new Python connection: the human goes back to spectators
+		for (int i = 0; i < czlowiek.length; i++)
 			if (czlowiek[i] && gracze[i] != null) {
 				ServerPlayer c = gracze[i];
 				if (!c.isRemoved()) c.setGameMode(GameType.SPECTATOR);
@@ -614,7 +601,7 @@ public class PvpBridge implements ModInitializer {
 		}
 		buforObs = ByteBuffer.allocate(8 + 4 * RAW * N).order(ByteOrder.LITTLE_ENDIAN);
 		tempoGry = Math.max(1f, tempo);
-		server.tickRateManager().setTickRate(20f);   // spawning at normal speed
+		server.tickRateManager().setTickRate(20f);
 		tickiGry = 0;
 		tickiSpawnu = 0;
 		stan = Stan.SPAWN;
@@ -651,7 +638,6 @@ public class PvpBridge implements ModInitializer {
 		int n = gracze.length;
 		for (int i = 0; i < n; i++)
 			if (czlowiek[i] && gracze[i].isRemoved()) zwolnijSlot(i, false);
-		// 1. observations
 		buforObs.clear();
 		buforObs.putInt(tickiGry++);
 		buforObs.putInt(n);
@@ -701,7 +687,7 @@ public class PvpBridge implements ModInitializer {
 				for (int k = 0; k < 4; k++) {
 					int i = p0 + k;
 					if (wypadl[i]) continue;
-					if (zgloszone[i]) { zaparkuj(i); zginal[i] = false; }   // died in 1v3: out of the arena until the round ends
+					if (zgloszone[i]) { zaparkuj(i); zginal[i] = false; }
 					else poza |= pozaKlatka(i);
 				}
 				if (poza) resetujArene(a, 1);
@@ -755,8 +741,8 @@ public class PvpBridge implements ModInitializer {
 		b.putFloat(czlowiek[i] ? 1 : 0);
 		b.putFloat(bron[i]);
 		b.putFloat(p.getArmorValue());
-		// --- items (23–49); everything the player sees in its own inventory, and about the opponent: what it holds, whether
-		// it draws/eats/blocks, its arrow in flight and bobber — Python takes only the visible fields from the opponent's row
+		// --- items (23-49); everything the player sees in its own inventory, and about the opponent: what it holds, whether
+		// it draws/eats/blocks, its arrow in flight and bobber - Python takes only the visible fields from the opponent's row
 		var inv = p.getInventory();
 		b.putFloat(inv.getSelectedSlot());                                    // 23 selected slot
 		b.putFloat(kategoria(p.getMainHandItem()));                           // 24 item in hand (category)
@@ -776,12 +762,12 @@ public class PvpBridge implements ModInitializer {
 		Entity zaczep = hak == null ? null : hak.getHookedIn();
 		boolean zaczepWroga = zaczep instanceof ServerPlayer zp && zp != p && klatkaGracza(zp) == a;
 		b.putFloat(hak == null ? 0 : zaczepWroga ? 2 : 1);                    // 36 bobber: none / in the air / hooked
-		b.putFloat(hak == null ? 0 : (float) (hak.getX() - srodekX(a) - 0.5));   // 37–39 bobber (relative to the arena)
+		b.putFloat(hak == null ? 0 : (float) (hak.getX() - srodekX(a) - 0.5));   // 37-39 bobber (relative to the arena)
 		b.putFloat(hak == null ? 0 : (float) (hak.getY() - Y0 - 1));
 		b.putFloat(hak == null ? 0 : (float) (hak.getZ() - srodekZ(a) - 0.5));
 		AbstractArrow s = (maska[i] & Z_LUK) != 0 ? strzalaWLocie(p, o, a) : null;
 		Vec3 sv = s == null ? Vec3.ZERO : s.getDeltaMovement();
-		b.putFloat(s == null ? 0 : (float) (s.getX() - srodekX(a) - 0.5));  // 40–45 the arrow in flight closest to the opponent
+		b.putFloat(s == null ? 0 : (float) (s.getX() - srodekX(a) - 0.5));  // 40-45 the arrow in flight closest to the opponent
 		b.putFloat(s == null ? 0 : (float) (s.getY() - Y0 - 1));
 		b.putFloat(s == null ? 0 : (float) (s.getZ() - srodekZ(a) - 0.5));
 		b.putFloat((float) sv.x);
@@ -791,7 +777,7 @@ public class PvpBridge implements ModInitializer {
 		b.putFloat(trafStrzala[i]);                                           // 47 arrow hits this round
 		b.putFloat(zablokowane[i]);                                           // 48 hits taken on the shield this round
 		b.putFloat(postawione[i]);                                            // 49 blocks placed this round
-		// 50–124: blocks around the player in ITS frame (forward f, right r), levels -1 (below the feet), 0, +1
+		// 50-124: blocks around the player in ITS frame (forward f, right r), levels -1 (below the feet), 0, +1
 		float yr = p.getYRot() * Mth.DEG_TO_RAD;
 		double fx = -Mth.sin(yr), fz = Mth.cos(yr), rx = -Mth.cos(yr), rz = -Mth.sin(yr);
 		ServerLevel lv = (ServerLevel) p.level();
@@ -802,14 +788,14 @@ public class PvpBridge implements ModInitializer {
 					BlockPos bp = BlockPos.containing(p.getX() + f * fx + r * rx, p.getY() + dy, p.getZ() + f * fz + r * rz);
 					b.putFloat(lv.getBlockState(bp).isAir() ? 0 : 1);
 				}
-		// --- stage 6 (125–248)
+		// --- stage 6 (125-248)
 		ItemStack s6 = inv.getItem(6);
 		b.putFloat(s6.is(Items.LAVA_BUCKET) ? 1 : s6.is(Items.BUCKET) ? 2 : 0);   // 125 bucket: with lava / empty / none
 		b.putFloat(ileLeczenia(inv));                                          // 126 healing potions
 		ItemStack s8 = inv.getItem(8);
 		b.putFloat(s8.isEmpty() ? 0 : mikstura[i]);                           // 127 potion kind in slot 8
 		b.putFloat(s8.getCount());                                            // 128 count
-		for (Holder<MobEffect> ef : EFEKTY) {                                 // 129–142 effects: level (0 none), seconds
+		for (Holder<MobEffect> ef : EFEKTY) {                                 // 129-142 effects: level (0 none), seconds
 			MobEffectInstance e = p.getEffect(ef);
 			b.putFloat(e == null ? 0 : e.getAmplifier() + 1);
 			b.putFloat(e == null ? 0 : Math.min(e.getDuration(), 12000) / 20f);
@@ -817,13 +803,13 @@ public class PvpBridge implements ModInitializer {
 		b.putFloat(p.getRemainingFireTicks() / 20f);                          // 143 how long it will keep burning (s)
 		b.putFloat(p.isInLava() ? 1 : 0);                                     // 144 in lava
 		b.putFloat(p.isOnFire() ? 1 : 0);                                     // 145 burning (visible from afar)
-		for (int k = 0; k < 4; k++) {                                         // 146–149 I can see player k of the arena (no occlusion)
+		for (int k = 0; k < 4; k++) {                                         // 146-149 I can see player k of the arena (no occlusion)
 			int j = k < ile[a] ? pocz[a] + k : -1;
 			b.putFloat(j < 0 || j == i ? 0 : !wypadl[i] && !wypadl[j] && widzi(p, gracze[j]) ? 1 : 0);
 		}
 		b.putFloat(wypadl[i] ? 1 : 0);                                        // 150 out of play until the round ends
-		// 151–199: surface height in a MAPA×MAPA grid around the player (its frame), relative to its feet;
-		// 200–248: lava on the surface of that column
+		// 151-199: surface height in a MAPA×MAPA grid around the player (its frame), relative to its feet;
+		// 200-248: lava on the surface of that column
 		int pm = MAPA / 2;
 		float[] lawy = new float[MAPA * MAPA];
 		int stopy = Mth.floor(p.getY() + 0.01);
@@ -908,7 +894,7 @@ public class PvpBridge implements ModInitializer {
 				|| blok.getLocation().distanceToSqr(oko) > traf.get().distanceToSqr(oko);
 	}
 
-	/** Whether some part of q (eyes, middle or feet) is visible from p's eye — terrain can occlude. */
+	/** Whether some part of q (eyes, middle or feet) is visible from p's eye - terrain can occlude. */
 	static boolean widzi(ServerPlayer p, ServerPlayer q) {
 		Vec3 oko = p.getEyePosition();
 		for (double h : new double[]{q.getEyeHeight(), q.getBbHeight() * 0.5, 0.2}) {
@@ -920,7 +906,7 @@ public class PvpBridge implements ModInitializer {
 	}
 
 	static void zastosuj(int i, float[] akc) {
-		// NaN in the action = this player is driven by something else (e.g. the ported pvp-bot-fabric in turniej_obcy.py) — leave it alone
+		// NaN = this player is driven by something else (pvp-bot), leave it alone
 		if (Float.isNaN(akc[0])) return;
 		ServerPlayer p = gracze[i];
 		ServerPlayer o = gracze[cel[i]];
@@ -940,7 +926,7 @@ public class PvpBridge implements ModInitializer {
 		p.setYRot(yaw);
 		p.setXRot(pitch);
 		p.setYHeadRot(yaw);
-		int slot = Math.round(akc[8]);                  // 0 = no change, 1–9 = hotbar slot 0–8
+		int slot = Math.round(akc[8]);
 		if (slot >= 1 && slot <= 9 && p.getInventory().getSelectedSlot() != slot - 1) {
 			if (p.isUsingItem()) p.releaseUsingItem();
 			p.getInventory().setSelectedSlot(slot - 1);
@@ -953,8 +939,7 @@ public class PvpBridge implements ModInitializer {
 		uzyj(i, p, akc[9] > 0.5f);
 		// as in the client: while the player is using something (shield up, eating, drawing a bow), left-click is ignored
 		if (cios && !p.isUsingItem()) {
-			// like the client: an attack packet (when the crosshair is on the opponent), then an arm swing,
-			// which resets the attack bar on the server.
+			// like the client: an attack packet if the crosshair is on the opponent, then a swing that resets the attack bar
 			// akc[4]: 1 = the server computes the crosshair (play without lag), 2 = a lagged client saw a hit
 			// (Python checked the crosshair on what the player saw; the server, like an anticheat with ping tolerance,
 			// checks reach: 3 blocks + 1, and terrain occlusion), 3 = the client saw a miss (swing only).
@@ -992,7 +977,7 @@ public class PvpBridge implements ModInitializer {
 		wcisniety[i] = chce;
 	}
 
-	/** One right-button use: a block onto the face under the crosshair or the item in hand (and if the hand does nothing — the shield). */
+	/** One right-button use: a block onto the face under the crosshair or the item in hand (and if the hand does nothing - the shield). */
 	static void uzyjRaz(int i, ServerPlayer p) {
 		ServerLevel lv = (ServerLevel) p.level();
 		ItemStack reka = p.getMainHandItem();
@@ -1011,7 +996,7 @@ public class PvpBridge implements ModInitializer {
 	}
 
 	/** Right button as in the client: click (rising edge) = use the item in hand, and if the hand does nothing
-	 *  (sword, axe, fist) — the shield from the off hand; holding = drawing a bow / eating / drinking / blocking;
+	 *  (sword, axe, fist) - the shield from the off hand; holding = drawing a bow / eating / drinking / blocking;
 	 *  release = shoot / interrupt. Bucket: pours lava onto the block under the crosshair (empty: picks lava up).
 	 *  A splash potion is thrown immediately. Blocks: placed on the face under the crosshair, every 4 ticks while held. */
 	static void uzyj(int i, ServerPlayer p, boolean chce) {
@@ -1041,7 +1026,6 @@ public class PvpBridge implements ModInitializer {
 		wcisniety[i] = chce;
 	}
 
-	// ---------------------------------------------------------------- networking
 
 	static ByteBuffer czytaj(int ile) throws IOException {
 		if (buforAkcji == null || buforAkcji.capacity() < ile)
@@ -1065,7 +1049,6 @@ public class PvpBridge implements ModInitializer {
 		server.tickRateManager().setTickRate(20f);
 	}
 
-	// ---------------------------------------------------------------- human vs network
 
 	static int wykonajWalcz(ServerPlayer p, int ty, int siec) {
 		String odp = HASLO != null && !zweryfikowani.contains(p.getUUID()) ? "First /haslo <password>." : walcz(p, ty, siec);
@@ -1081,11 +1064,11 @@ public class PvpBridge implements ModInitializer {
 		if (p instanceof EntityPlayerMPFake) return "This command is for real players.";
 		for (int i = 0; i < czlowiek.length; i++)
 			if (czlowiek[i] && gracze[i] == p) {
-				if (ty >= 0) {                              // already fighting: only a weapon change, from the next round
+				if (ty >= 0) {
 					bronCz = ty;
 					bronSieciCz = siec;
 					resetujArene(klatka[i], 1);
-					return "New round: you — " + NAZWY_BRONI[ty] + ", network — " + NAZWY_BRONI[siec] + ".";
+					return "New round: you - " + NAZWY_BRONI[ty] + ", network - " + NAZWY_BRONI[siec] + ".";
 				}
 				zwolnijSlot(i, true);
 				return "You left the arena. Score: " + wygraneCz + " wins, " + przegraneCz + " losses, "
@@ -1130,7 +1113,7 @@ public class PvpBridge implements ModInitializer {
 		int p0 = pocz[a];
 		int ja = czlowiek[p0] ? p0 : p0 + 1, on = ja == p0 ? p0 + 1 : p0;
 		String tekst;
-		if (zgloszone[ja]) { przegraneCz++; tekst = "Loss — the network took you down."; }
+		if (zgloszone[ja]) { przegraneCz++; tekst = "Loss - the network took you down."; }
 		else if (zgloszone[on]) { wygraneCz++; tekst = "Win! You took the network down."; }
 		else { czasCz++; tekst = "Time is up (60 s)."; }
 		gracze[ja].sendSystemMessage(Component.literal(tekst + "  Score: " + wygraneCz + " W / " + przegraneCz
@@ -1138,7 +1121,7 @@ public class PvpBridge implements ModInitializer {
 	}
 
 	/** Loadout for the round: clears the inventory (armor too) and puts the weapon into the first slot (a new item every
-	 *  round = full durability). With a weapon (sword, axe) full diamond armor, with fists — no armor.
+	 *  round = full durability). With a weapon (sword, axe) full diamond armor, with fists - no armor.
 	 *  Hotbar: 0 weapon, 1 bow, 2 golden apples, 3 steaks, 4 fishing rod, 5 blocks, 6 lava bucket, 7 healing potions (splash),
 	 *  8 a potion from the list; arrows in the backpack; shield in the off hand. */
 	static void uzbroj(ServerPlayer p, int kod, int m, int rodzaj) {
@@ -1166,7 +1149,7 @@ public class PvpBridge implements ModInitializer {
 			p.setItemSlot(EquipmentSlot.FEET, new ItemStack(Items.DIAMOND_BOOTS));
 		}
 		inv.setSelectedSlot(0);
-		if (!(p instanceof EntityPlayerMPFake))            // real client: also switch its hotbar selection
+		if (!(p instanceof EntityPlayerMPFake))
 			p.connection.send(new ClientboundSetHeldSlotPacket(0));
 	}
 }

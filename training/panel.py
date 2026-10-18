@@ -1,10 +1,9 @@
-"""Training dashboard (http://<host>:8780) — charts from the log + an x-ray of the network.
+"""Training dashboard backend (http://<host>:8780).
 
-GET /             -> panel_web/index.html (live data also comes from the show: ws://<host>:8771)
-GET /api/log      -> training log averaged down to ~120 points + current numbers
-GET /api/xray     -> x-ray of the latest network version on a sample of real situations from the show
-                     (dead neurons, weight magnitudes, action tendencies, value estimate, zone map, distance);
-                     computed in the background every 2 minutes
+GET /           -> panel_web/index.html (live data from the show: ws://<host>:8771)
+GET /api/log    -> training log averaged to ~120 points + current numbers
+GET /api/xray   -> analysis of the latest checkpoint on a sample from the show, recomputed every 2 minutes
+GET /api/egzamin, /api/straznik -> exams, mastery conditions
 
   python panel.py --nazwa pvp2
 """
@@ -28,10 +27,10 @@ from features import GLOWY, N_CECH, STOS, WEJSCIE
 from network import Siec, dopasuj
 
 KAT = Path(__file__).parent
-ALARM_SILA = 40.0          # % wins vs older versions (over >= 150 rounds) — below: alarm
-ALARM_ZAPOMINANIE = 40.0   # % wins vs the fists champion in the last exam — below: alarm
-ALARM_PAT = 8.0            # % draws over 50 updates — above: the networks stop fighting ("dance"); from stage 5 on shields give a constant ~4–7%
-ALARM_KL = 0.12            # mean network change per update (KL) — about 2x the typical level (0.05–0.065)
+ALARM_SILA = 40.0          # % wins vs older versions (over >= 150 rounds) - below: alarm
+ALARM_ZAPOMINANIE = 40.0   # % wins vs the fists champion in the last exam - below: alarm
+ALARM_PAT = 8.0            # % draws over 50 updates; shields alone give ~4-7%
+ALARM_KL = 0.12            # mean KL per update, ~2x the normal level
 OST = (STOS - 1) * N_CECH                # start of the newest tick in the network input
 PRZOD, PRAWO, ODL, CELUJE, PASEK = 18, 19, 21, 26, 3
 
@@ -74,7 +73,6 @@ def dane_logu(nazwa):
             ent=round(srednia("entropia") or 0, 3), kl=round(srednia("kl") or 0, 4),
             clip=round(srednia("clipfrac") or 0, 3), wart=round(srednia("strata_wartosci") or 0, 4),
             skok=srednia("skok_proc"), sprint=srednia("sprint_proc"),
-            # items: uses per round with items
             **{k: (round(suma(k) / suma("rund_przedm"), 2) if suma("rund_przedm") else None)
                for k in ("strzaly", "traf_strzala", "blokady", "zjedzone", "haki", "bloki_post")}))
     ost = r[-100:]
@@ -116,7 +114,7 @@ def alarmy(r, dziala, egz=()):
     rr = sum(liczba(x, "rund") or 0 for x in r[-50:])
     rem = sum(liczba(x, "remisy") or 0 for x in r[-50:])
     if rr >= 200 and 100 * rem / rr > ALARM_PAT:
-        wynik.append(dict(poziom="zle", tekst=f"Stalemate: {100 * rem / rr:.0f}% of rounds end in a draw — the networks circle instead of fighting "
+        wynik.append(dict(poziom="zle", tekst=f"Stalemate: {100 * rem / rr:.0f}% of rounds end in a draw - the networks circle instead of fighting "
                                                 f"(threshold {ALARM_PAT:.0f}%)."))
     kl = [liczba(x, "kl") for x in r[-50:] if liczba(x, "kl") is not None]
     if kl and sum(kl) / len(kl) > ALARM_KL:
@@ -202,7 +200,7 @@ class Rentgen:
 
 
 def stan_straznika(args):
-    """Stage-mastery conditions (same as watchdog.py) — for the achievements in the panel."""
+    """Stage-mastery conditions (same as watchdog.py) - for the achievements in the panel."""
     if args.start is None:
         return {"jest": False}
     try:

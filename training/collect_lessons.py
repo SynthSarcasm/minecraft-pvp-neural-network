@@ -1,9 +1,5 @@
-"""Item lessons: the teacher bot (bots.BotPrzedmiotyy) fights and records (network input, its decisions).
-
-Player 2a = teacher, 2a+1 = plain bot v2 (this is also a tournament: do the items pay off at all).
-Mostly saves ticks in which the teacher does something with items (+ a share of ordinary ticks) to recordings/<prefix>_*.npz.
-The trainer reads them with --lekcje 'lekcje6_*.npz' (stage-6 lessons teach heads 6–8) or
---lekcje 'lekcje_przedm_*.npz' --glowy_lekcji 7,8 (only the slot and right-button heads).
+"""Record item lessons: the teacher (bots.BotPrzedmioty) fights bot v2 and its decisions are saved to
+recordings/<prefix>_*.npz, mostly from ticks where it uses an item. train.py reads them with --lekcje.
 
   python collect_lessons.py --port 25603 --sekundy 300
 """
