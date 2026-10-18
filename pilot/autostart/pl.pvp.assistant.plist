@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- macOS LaunchAgent: starts training/game_watcher.py at login; it runs assistant.py whenever the Minecraft
+     installation with the game directory "minecraft-siec" is running. Install: see docs/setup.md, "Auto-start". -->
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>pl.pvp.assistant</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__PROJECT__/training/.venv/bin/python</string>
+		<string>-u</string>
+		<string>__PROJECT__/training/game_watcher.py</string>
+	</array>
+	<key>WorkingDirectory</key><string>__PROJECT__/training</string>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><true/>
+	<key>ProcessType</key><string>Background</string>
+	<key>StandardOutPath</key><string>__HOME__/Library/Logs/pvp-assistant.log</string>
+	<key>StandardErrorPath</key><string>__HOME__/Library/Logs/pvp-assistant.log</string>
+</dict>
+</plist>

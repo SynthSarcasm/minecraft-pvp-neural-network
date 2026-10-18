@@ -1,0 +1,14 @@
+{
+	"required": true,
+	"package": "pl.pvp.pilot.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"GameRendererMixin",
+		"EntityMixin",
+		"LivingEntityMixin",
+		"MinecraftMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

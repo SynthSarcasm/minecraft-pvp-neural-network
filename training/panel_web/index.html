@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PvP network · live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Designed for a 1280×720 TV screen; everything is scaled to the window. */
+  :root {
+    color-scheme: dark;
+    --tlo: #08070c; --tlo-2: #0f0d16; --karta: #15131d; --karta-2: #1c1a26; --krawedz: rgba(255,255,255,0.08);
+    --tekst: #f4f2ea; --tekst-2: #c3c2b7; --tekst-3: #898781; --siatka: #2a2833; --os: #3a3844;
+    --a: #3987e5; --b: #d95926; --s3: #199e70;
+    --dobre: #0ca30c; --zle: #d03b3b; --zloto: #f2c14e; --xp: #80e33a; --serce: #e2373f;
+    --pix: "Pixelify Sans", ui-monospace, "SF Mono", Menlo, monospace;
+    font-variant-ligatures: none;
+  }
+  * { box-sizing: border-box; font-variant-ligatures: none; font-feature-settings: "liga" 0, "clig" 0, "calt" 0; }
+  html, body { margin: 0; height: 100%; background: var(--tlo); color: var(--tekst); overflow: hidden;
+    font: 15px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; }
+  #ekran { width: 1280px; height: 720px; position: relative; transform-origin: center center; flex: none;
+    background:
+      radial-gradient(900px 500px at 50% -10%, #2a1d4a55, transparent 70%),
+      radial-gradient(700px 400px at 100% 110%, #11314a44, transparent 70%),
+      var(--tlo); overflow: hidden; }
+  #ekran::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--siatka) 1px, transparent 1px), linear-gradient(90deg, var(--siatka) 1px, transparent 1px);
+    background-size: 32px 32px; mask-image: radial-gradient(ellipse at 50% 40%, #000 0%, transparent 75%); }
+
+  /* ---------- top bar */
+  header { position: absolute; left: 0; right: 0; top: 0; height: 60px; display: flex; align-items: center; gap: 14px;
+    padding: 0 20px; background: linear-gradient(180deg, #0c0b12, #0c0b12cc); border-bottom: 1px solid var(--krawedz); z-index: 5; }
+  .logo { font-family: var(--pix); font-size: 26px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 10px; }
+  .logo .kostka { width: 26px; height: 26px; image-rendering: pixelated; }
+  .logo b { color: var(--zloto); }
+  .etap { font-family: var(--pix); font-size: 14px; padding: 4px 10px; border: 1px solid #f2c14e66; color: var(--zloto);
+    background: #f2c14e14; border-radius: 4px; white-space: nowrap; }
+  .zakladki { display: flex; gap: 4px; margin-left: 10px; }
+  .zakladka { font-family: var(--pix); font-size: 16px; padding: 6px 14px; border-radius: 4px; color: var(--tekst-3);
+    cursor: pointer; position: relative; user-select: none; }
+  .zakladka.akt { color: var(--tekst); background: var(--karta-2); }
+  .zakladka .postep { position: absolute; left: 8px; right: 8px; bottom: 2px; height: 2px; background: transparent; }
+  .zakladka.akt .postep > i { display: block; height: 100%; width: 0; background: var(--zloto); }
+  .prawo { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+  .chip { font-size: 13px; padding: 4px 10px; border-radius: 999px; background: var(--karta); border: 1px solid var(--krawedz);
+    color: var(--tekst-2); white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+  .chip b { color: var(--tekst); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--tekst-3); flex: none; }
+  .dot.zywy { background: #e33; box-shadow: 0 0 0 0 #e33a; animation: puls 1.6s infinite; }
+  .dot.ok { background: var(--dobre); }
+  .dot.zle { background: var(--zle); }
+  @keyframes puls { 0% { box-shadow: 0 0 0 0 #ee333388; } 70% { box-shadow: 0 0 0 8px #ee333300; } 100% { box-shadow: 0 0 0 0 #ee333300; } }
+  .tv { cursor: pointer; font-family: var(--pix); }
+  #alarm { display: none; background: #3a0d10; border: 1px solid var(--zle); color: #ffd0d0; padding: 3px 10px; border-radius: 999px;
+    font-size: 12.5px; max-width: 330px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #alarm b { font-family: var(--pix); color: #ff8a8a; margin-right: 6px; }
+
+  /* ---------- scenes */
+  .scena { position: absolute; left: 0; right: 0; top: 60px; bottom: 0; padding: 14px 16px 16px; opacity: 0;
+    pointer-events: none; transition: opacity .5s ease; }
+  .scena.akt { opacity: 1; pointer-events: auto; }
+  .karta { background: linear-gradient(180deg, var(--karta-2), var(--karta)); border: 1px solid var(--krawedz);
+    border-radius: 10px; padding: 12px 14px; min-width: 0; min-height: 0; position: relative;
+    display: flex; flex-direction: column; overflow: hidden; }
+  .karta > h2, .karta > .opis, .karta > .naglowek { flex: none; }
+  h2 { font-family: var(--pix); font-size: 16px; font-weight: 600; margin: 0 0 4px; letter-spacing: .3px; color: var(--tekst); }
+  .opis { color: var(--tekst-3); font-size: 12.5px; margin: 0 0 6px; }
+  .wykres { position: relative; flex: 1 1 0; min-height: 0; }
+  .plotno-box { flex: 1 1 0; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; }
+
+  /* ARENA */
+  #s-arena { display: grid; grid-template-columns: 286px 1fr 286px; gap: 14px; }
+  .kol { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .srodek { display: flex; flex-direction: column; gap: 10px; align-items: center; min-height: 0; }
+  .tablica { width: 100%; display: grid; grid-template-columns: 1fr 120px 1fr; align-items: stretch; gap: 0;
+    background: #0d0c13; border: 1px solid var(--krawedz); border-radius: 10px; overflow: hidden; }
+  .zawodnik { padding: 8px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .zawodnik.a { border-left: 4px solid var(--a); background: linear-gradient(90deg, #3987e522, transparent); }
+  .zawodnik.b { border-right: 4px solid var(--b); background: linear-gradient(270deg, #d9592622, transparent); align-items: flex-end; }
+  .zawodnik .imie { font-family: var(--pix); font-size: 18px; display: flex; gap: 8px; align-items: center; }
+  .zawodnik.b .imie { flex-direction: row-reverse; }
+  .zawodnik .ping { font-size: 12px; color: var(--tekst-3); font-family: var(--pix); }
+  .serca { display: flex; gap: 1px; height: 14px; }
+  .zawodnik.b .serca { flex-direction: row-reverse; }
+  .serca canvas { image-rendering: pixelated; }
+  .pasek-ataku { width: 120px; height: 5px; background: #ffffff14; border-radius: 3px; overflow: hidden; }
+  .pasek-ataku > i { display: block; height: 100%; width: 0; background: var(--tekst-2); transition: width .08s linear; }
+  .pasek-ataku.pelny > i { background: var(--zloto); }
+  .ikony { display: flex; gap: 4px; align-items: center; }
+  .ikony canvas { image-rendering: pixelated; }
+  .zegar { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #08070c;
+    border-left: 1px solid var(--krawedz); border-right: 1px solid var(--krawedz); }
+  .zegar .czas { font-family: var(--pix); font-size: 34px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .zegar .wynik { font-family: var(--pix); font-size: 14px; color: var(--tekst-2); margin-top: 3px; }
+  .zegar .wynik b.a { color: var(--a); } .zegar .wynik b.b { color: var(--b); }
+  #arena { border-radius: 8px; image-rendering: pixelated; box-shadow: 0 20px 60px #000c, 0 0 0 1px #ffffff10; }
+  .reka h2 .kto { display: inline-block; width: 10px; height: 10px; margin-right: 6px; border-radius: 2px; }
+  .klawiatura { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 6px; }
+  .klawisz { height: 33px; border-radius: 6px; background: #ffffff0a; border: 1px solid #ffffff14; border-bottom-width: 3px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--pix); font-size: 15px;
+    color: var(--tekst-3); position: relative; overflow: hidden; transition: background .1s, color .1s, box-shadow .1s; }
+  .klawisz small { font-family: system-ui; font-size: 9.5px; color: inherit; opacity: .8; margin-top: -2px; }
+  .klawisz.szeroki { grid-column: span 2; }
+  .klawisz.pusty { visibility: hidden; }
+  .mysz { display: grid; grid-template-columns: 1fr 70px; gap: 8px; margin-top: 6px; align-items: center; }
+  .mysz .opis { margin: 0; }
+  .liny { margin: 6px 0 2px; position: relative; height: 26px; border-radius: 6px; overflow: hidden; display: flex;
+    background: #ffffff0a; border: 1px solid var(--krawedz); }
+  .liny > i { display: block; height: 100%; transition: width .4s ease; }
+  .liny .la { background: linear-gradient(90deg, #3987e5aa, var(--a)); width: 50%; }
+  .liny .lb { background: linear-gradient(270deg, #d95926aa, var(--b)); flex: 1; }
+  .liny::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 2px; background: #fff8; }
+  .liny-podpis { display: flex; justify-content: space-between; font-family: var(--pix); font-size: 15px; }
+  .relacja { flex: 1; overflow: hidden; display: flex; flex-direction: column; gap: 5px; min-height: 0; }
+  .zd { font-size: 13px; padding: 5px 8px; border-radius: 6px; background: #ffffff08; border-left: 3px solid var(--os);
+    animation: wjazd .35s ease; display: flex; gap: 6px; align-items: baseline; }
+  .zd .godz { color: var(--tekst-3); font-variant-numeric: tabular-nums; font-size: 11px; flex: none; }
+  .zd.a { border-left-color: var(--a); } .zd.b { border-left-color: var(--b); }
+  .zd.ko { background: #f2c14e14; border-left-color: var(--zloto); }
+  .zd .na { color: var(--a); font-weight: 650; } .zd .nb { color: var(--b); font-weight: 650; }
+  .zd .kryt { font-family: var(--pix); color: var(--zloto); }
+  @keyframes wjazd { from { transform: translateX(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .bilans { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 13px; color: var(--tekst-2); }
+  .bilans b { font-family: var(--pix); font-size: 16px; color: var(--tekst); text-align: right; font-weight: 600; }
+
+  /* PROGRESS */
+  #s-postep { display: grid; grid-template-rows: 186px 1fr 172px; gap: 12px; }
+  .gora { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .osiagniecia { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-top: 6px; }
+  .osiag { display: grid; grid-template-columns: 46px 1fr; gap: 8px; align-items: center; padding: 8px; border-radius: 8px;
+    background: #ffffff06; border: 1px solid #ffffff10; filter: grayscale(1); opacity: .55; transition: all .5s; }
+  .osiag.zdobyte { filter: none; opacity: 1; background: linear-gradient(180deg, #f2c14e1c, #f2c14e08); border-color: #f2c14e77;
+    box-shadow: 0 0 22px #f2c14e22 inset; }
+  .ramka { width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; position: relative;
+    background: #2b2b2b; box-shadow: inset 0 0 0 2px #555, inset 0 0 0 4px #1b1b1b; image-rendering: pixelated; }
+  .osiag.zdobyte .ramka { background: #3b2f12; box-shadow: inset 0 0 0 2px var(--zloto), inset 0 0 0 4px #5b4510; }
+  .ramka canvas { image-rendering: pixelated; }
+  .osiag .tyt { font-family: var(--pix); font-size: 14px; line-height: 1.1; }
+  .osiag.zdobyte .tyt { color: var(--zloto); }
+  .osiag .pod { font-size: 11px; color: var(--tekst-3); line-height: 1.2; margin-top: 2px; }
+  .xp { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-top: 10px; }
+  .xp .poz { font-family: var(--pix); font-size: 22px; color: var(--xp); text-shadow: 0 2px 0 #0008; }
+  .xp .tor { height: 12px; background: #1a1a1a; border: 2px solid #000; position: relative; display: grid;
+    grid-template-columns: repeat(6, 1fr); gap: 2px; padding: 1px; }
+  .xp .tor i { display: block; height: 100%; background: #2c3a22; }
+  .xp .tor i.pelne { background: linear-gradient(180deg, #b8ff6c, #57b51d); box-shadow: 0 0 8px #80e33a88; }
+  .xp .tekst { font-family: var(--pix); font-size: 14px; color: var(--tekst-2); white-space: nowrap; }
+  .droga { display: flex; align-items: center; gap: 0; margin-top: 10px; font-size: 12px; color: var(--tekst-3); }
+  .droga .krok { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .droga .krok b { font-family: var(--pix); font-weight: 600; font-size: 13px; color: var(--tekst-2); }
+  .droga .krok.teraz b { color: var(--zloto); }
+  .droga .krok i { width: 10px; height: 10px; background: var(--os); transform: rotate(45deg); flex: none; }
+  .droga .krok.zrob i { background: var(--tekst-2); } .droga .krok.teraz i { background: var(--zloto); box-shadow: 0 0 10px var(--zloto); }
+  .droga .linia { flex: 1; height: 2px; background: linear-gradient(90deg, var(--tekst-3), var(--os)); margin: 0 10px; min-width: 20px; }
+  .srodkowy { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; min-height: 0; }
+  .dolny { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .naglowek { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+  .liczby { display: flex; gap: 18px; flex: none; }
+  .liczby div { text-align: right; }
+  .liczby .w { font-family: var(--pix); font-size: 24px; font-weight: 700; line-height: 1; }
+  .liczby .e { font-size: 11px; color: var(--tekst-3); }
+
+  /* BRAIN */
+  #s-mozg { display: grid; grid-template-columns: 430px 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px; }
+  #s-mozg .duza { grid-row: span 2; }
+  .wartosci { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
+  .wartosci .karta-mini { background: #ffffff06; border-radius: 6px; padding: 6px 8px; font-size: 12px; color: var(--tekst-3); }
+  .wartosci b { display: block; font-family: var(--pix); font-size: 20px; color: var(--tekst); }
+  .legenda { display: flex; gap: 12px; flex-wrap: wrap; color: var(--tekst-2); font-size: 12px; }
+  .legenda span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px;
+    vertical-align: -1px; background: var(--k); }
+</style>
+</head>
+<body>
+<div id="ekran">
+  <header>
+    <div class="logo"><canvas class="kostka" id="logo-ikona" width="13" height="13"></canvas>PvP <b>NET</b></div>
+    <span class="etap" id="etap">STAGE 6 · TERRAIN, POTIONS, 1v3</span>
+    <nav class="zakladki" id="zakladki">
+      <div class="zakladka akt" data-s="arena">ARENA<span class="postep"><i></i></span></div>
+      <div class="zakladka" data-s="postep">PROGRESS<span class="postep"><i></i></span></div>
+      <div class="zakladka" data-s="mozg">BRAIN<span class="postep"><i></i></span></div>
+    </nav>
+    <span id="alarm"></span>
+    <div class="prawo">
+      <span class="chip" id="c-zywo"><span class="dot"></span>live</span>
+      <span class="chip" id="c-trening"><span class="dot"></span>training</span>
+      <span class="chip">version <b id="c-wersja">—</b></span>
+      <span class="chip"><b id="c-kroki">—</b> steps</span>
+      <span class="chip tv" id="c-tv" title="automatic scene switching (key T)">TV ▶</span>
+    </div>
+  </header>
+
+  <!-- ===================================================== ARENA -->
+  <section class="scena akt" id="s-arena">
+    <div class="kol">
+      <div class="karta reka" id="reka-a"></div>
+      <div class="karta reka" id="reka-b"></div>
+    </div>
+    <div class="srodek">
+      <div class="tablica">
+        <div class="zawodnik a">
+          <div class="imie"><span>NET A</span><span class="ikony" id="ik-a"></span></div>
+          <div class="serca" id="serca-a"></div>
+          <div class="pasek-ataku" id="atak-a"><i></i></div>
+          <div class="ping" id="ping-a">—</div>
+        </div>
+        <div class="zegar"><div class="czas" id="zegar">60</div><div class="wynik"><b class="a" id="ko-a">0</b> : <b class="b" id="ko-b">0</b></div></div>
+        <div class="zawodnik b">
+          <div class="imie"><span>NET B</span><span class="ikony" id="ik-b"></span></div>
+          <div class="serca" id="serca-b"></div>
+          <div class="pasek-ataku" id="atak-b"><i></i></div>
+          <div class="ping" id="ping-b">—</div>
+        </div>
+      </div>
+      <canvas id="arena" width="540" height="540" style="width:540px;height:540px"></canvas>
+    </div>
+    <div class="kol">
+      <div class="karta">
+        <h2>Who is winning</h2>
+        <p class="opis">Both networks' own value estimates, live.</p>
+        <div class="liny"><i class="la" id="lina-a"></i><i class="lb"></i></div>
+        <div class="liny-podpis"><span style="color:var(--a)" id="lv-a">—</span><span style="color:var(--b)" id="lv-b">—</span></div>
+      </div>
+      <div class="karta" style="flex:1;display:flex;flex-direction:column;min-height:0">
+        <h2>Play-by-play</h2>
+        <div class="relacja" id="relacja"><div class="zd"><span>Waiting for the first hits…</span></div></div>
+      </div>
+      <div class="karta">
+        <h2>Score since opening</h2>
+        <div class="bilans">
+          <span>Arena 1 · net A : net B (knockouts)</span><b id="bil-1">0 : 0</b>
+          <span>Arena 2 · net : bot v2 without ping</span><b id="bil-2">0 : 0</b>
+          <span>Mean damage per hit</span><b id="bil-dmg">—</b>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== PROGRESS -->
+  <section class="scena" id="s-postep">
+    <div class="karta gora">
+      <h2>Road to mastery</h2>
+      <div class="osiagniecia" id="osiagniecia"></div>
+      <div class="xp"><span class="poz" id="xp-poz">0/6</span><div class="tor" id="xp-tor"></div><span class="tekst" id="xp-tekst">—</span></div>
+      <div class="droga" id="droga"></div>
+    </div>
+    <div class="srodkowy">
+      <div class="karta">
+        <div class="naglowek"><div><h2>Form</h2>
+        <p class="opis">% of rounds won (thick line smoothed). Vs older versions &gt; 50% = the network has outgrown them.</p></div>
+        <div class="liczby"><div><div class="w" style="color:var(--a)" id="f-pula">—</div><div class="e">vs older</div></div>
+          <div><div class="w" style="color:var(--b)" id="f-bot">—</div><div class="e">vs bot v2</div></div>
+          <div><div class="w" id="f-ko">—</div><div class="e">knockouts</div></div></div></div>
+        <div class="wykres"><canvas id="w-forma"></canvas></div>
+      </div>
+      <div class="karta">
+        <h2>Exams</h2>
+        <p class="opis">Every ~25 min, outside training, with ping. 50% = equal strength.</p>
+        <div class="wykres"><canvas id="w-egz"></canvas></div>
+      </div>
+    </div>
+    <div class="dolny">
+      <div class="karta"><h2>How rounds end</h2><div class="wykres"><canvas id="w-rundy"></canvas></div></div>
+      <div class="karta"><h2>Round length</h2><div class="wykres"><canvas id="w-dl"></canvas></div></div>
+      <div class="karta"><h2>Jump and sprint</h2><div class="wykres"><canvas id="w-skok"></canvas></div></div>
+      <div class="karta"><h2>Items (per round)</h2><div class="wykres"><canvas id="w-ekw"></canvas></div></div>
+    </div>
+  </section>
+
+  <!-- ===================================================== BRAIN -->
+  <section class="scena" id="s-mozg">
+    <div class="karta duza">
+      <h2>Network A's brain, live</h2>
+      <p class="opis">2048 neurons of the last layer (averaged down to 256). Brighter = more active.</p>
+      <div class="plotno-box" id="mozg-box"><canvas id="mozg"></canvas></div>
+      <div class="wartosci">
+        <div class="karta-mini">dead neurons (block 2 / 3)<b id="mz-martwe">—</b></div>
+        <div class="karta-mini">decisiveness (entropy)<b id="mz-ent">—</b></div>
+      </div>
+    </div>
+    <div class="karta">
+      <h2>Zone map</h2>
+      <p class="opis" id="strefy-opis">Where the network keeps its opponent (triangle = the network, facing up).</p>
+      <div class="plotno-box" id="strefy-box"><canvas id="strefy"></canvas></div>
+    </div>
+    <div class="karta">
+      <h2>Fighting distance</h2>
+      <p class="opis">How often the fight happens at a given distance. Attack reach: 3 blocks.</p>
+      <div class="wykres"><canvas id="w-dystans"></canvas></div>
+    </div>
+    <div class="karta">
+      <h2>Dead neurons</h2>
+      <p class="opis">Every 100 updates training revives dormant ones. Fewer = better use of the network.</p>
+      <div class="wykres"><canvas id="w-martwe"></canvas></div>
+    </div>
+    <div class="karta">
+      <h2>Decisiveness</h2>
+      <p class="opis">Decision entropy: lower = more certain. A sharp drop can be a sign of trouble (e.g. a self-play "dance").</p>
+      <div class="wykres"><canvas id="w-ent"></canvas></div>
+    </div>
+  </section>
+</div>
+
+<script src="chart.umd.min.js"></script>
+<script>
+"use strict";
+// ======================================================================= basics
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const K = { a: css('--a'), b: css('--b'), s3: css('--s3'), tekst: css('--tekst'), tekst2: css('--tekst-2'), tekst3: css('--tekst-3'),
+  siatka: css('--siatka'), os: css('--os'), karta: css('--karta'), dobre: css('--dobre'), zle: css('--zle'), zloto: css('--zloto'), xp: css('--xp') };
+const fmt = (v, d = 0) => v == null ? '—' : v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+const $ = id => document.getElementById(id);
+let SKALA = 1;
+function dopasuj() {
+  SKALA = Math.min(innerWidth / 1280, innerHeight / 720);
+  $('ekran').style.transform = `scale(${SKALA})`;
+  Chart.defaults.devicePixelRatio = Math.max(1, devicePixelRatio * SKALA);
+  Object.values(Chart.instances || {}).forEach(c => c.resize());
+}
+const DPR = () => Math.max(1, devicePixelRatio * SKALA);
+
+// ======================================================================= pixel icons
+const PIX = {
+  serce:   ["..rr.rr..", ".rRRrRRr.", "rRWRRRRRr", "rRRRRRRRr", ".rRRRRRr.", "..rRRRr..", "...rRr...", "....r...."],
+  pol:     ["..rr.kk..", ".rRRkKKk.", "rRWRkKKKk", "rRRRkKKKk", ".rRRkKKk.", "..rRkKk..", "...rk....", "....k...."],
+  puste:   ["..kk.kk..", ".kKKkKKk.", "kKKKKKKKk", "kKKKKKKKk", ".kKKKKKk.", "..kKKKk..", "...kKk...", "....k...."],
+  miecz:   ["..........dd", ".........dWd", "........dWd.", ".......dWd..", "......dWd...", ".....dWd....",
+            "..g.dWd.....", "...gWd......", "...hg.......", "..h..g......", ".h..........", "h..........."],
+  siekiera:["........dd..", ".......dWWd.", "......dWWWWd", ".....hdWWWd.", "....h..dWd..", "...h....d...",
+            "..h.........", ".h..........", "h..........."],
+  piesc:   ["..ssss..", ".sSSSSs.", "sSSSSSSs", "sSSSSSSs", "sSSSSSSs", ".sSSSSs.", "..ssss.."],
+  zbroja:  ["dd....dd", "dWd..dWd", "dWWddWWd", ".dWWWWd.", ".dWWWWd.", ".dWWWWd.", ".dWWWWd.", ".dddddd."],
+  bot:     [".gggggg.", "gGGGGGGg", "gGrGGrGg", "gGGGGGGg", "gGkkkkGg", "gGGGGGGg", ".gggggg.", "..g..g.."],
+  zegar:   ["..yyyy..", ".yWWWWy.", "yWWkWWWy", "yWWkWWWy", "yWWkkkWy", "yWWWWWWy", ".yWWWWy.", "..yyyy.."],
+  sygnal:  [".......G", ".......G", ".....G.G", ".....G.G", "...G.G.G", "...G.G.G", ".G.G.G.G", ".G.G.G.G"],
+  korona:  ["y..y..y.", "yy.yy.yy", "yyyyyyyy", "yYYYYYYy", "yYrYYbYy", "yyyyyyyy"],
+  luk:     ["....hhh.....", "...h...s....", "..h.....s...", ".h.......s..", ".h.......s..", "..h.....s...", "...h...s....", "....hhh....."],
+  jablko:  ["...h....", "..yyy...", ".yYYYy..", "yYYwYYy.", "yYYYYYy.", ".yYYYy..", "..yyy..."],
+  stek:    [".rrrr...", "rRRRRr..", "rRwRRRr.", "rRRRRRr.", ".rRRRr..", "..rrr..."],
+  wedka:   ["........hh", "......hh.s", "....hh...s", "..hh.....s", "hh.......s", ".........R"],
+  blok:    ["KkKKkKKk", "kKKkKKkK", "KKkKKkKK", "kKKKkKKk", "KkKKKkKK", "KKkKkKKk", "kKKkKKKK", "KkKKkKkK"],
+  tarcza:  ["bbbbbbbb", "bBBBBBBb", "bBBBBBBb", "bBBhhBBb", "bBBBBBBb", ".bBBBBb.", "..bBBb..", "...bb..."],
+  kostka:  ["ddddddddddddd", "dGGGgGGGGgGGd", "dGgGGGGgGGGGd", "dbbbbbbbbbbbd", "dbBbbbBbbbBbd", "dbbbbbbbbbbbd",
+            "dbbBbbbbbBbbd", "dbbbbbbbbbbbd", "dBbbbbBbbbbbd", "dbbbbbbbbbbbd", "dbbbBbbbbbBbd", "dbbbbbbbbbbbd", "ddddddddddddd"],
+};
+const PALETA = { r: '#7a1016', R: '#e2373f', W: '#ffd6d6', k: '#1a1a1a', K: '#3a3a3a', d: '#14625a', g: '#3a3a3a', h: '#7a5230',
+  s: '#a8754f', S: '#e0ac7e', G: '#58d36a', y: '#8a6a12', Y: '#f2c14e', b: '#7a5230', B: '#5f3f22' };
+const PALETA_IKON = Object.assign({}, PALETA, { W: '#8ff0e4', r: '#7a1016', R: '#b8463a', G: '#7fe38a', k: '#5a5a5a', K: '#8a8a8a',
+  y: '#a07a14', Y: '#ffd84a', w: '#fff2d0', s: '#e8e8e8', h: '#8a5a2a', b: '#5f3f22', B: '#9b6b3a' });
+function ikona(nazwa, px, paleta = PALETA_IKON) {
+  const m = PIX[nazwa], c = document.createElement('canvas');
+  c.width = m[0].length; c.height = m.length;
+  const x = c.getContext('2d');
+  m.forEach((w, j) => [...w].forEach((ch, i) => { if (ch !== '.') { x.fillStyle = paleta[ch] || '#fff'; x.fillRect(i, j, 1, 1); } }));
+  c.style.width = (c.width * px) + 'px'; c.style.height = (c.height * px) + 'px';
+  return c;
+}
+(() => { const c = $('logo-ikona'), x = c.getContext('2d'), m = PIX.kostka;
+  const P = { d: '#1b1b1b', G: '#6fd04a', g: '#4ea832', b: '#8a5a32', B: '#6b4424' };
+  m.forEach((w, j) => [...w].forEach((ch, i) => { if (ch !== '.') { x.fillStyle = P[ch]; x.fillRect(i, j, 1, 1); } })); })();
+
+// hearts as canvas (10 hearts, halves)
+const SERCA = {};
+function przygotujSerca(id) {
+  const el = $(id); el.innerHTML = '';
+  const lista = [];
+  for (let i = 0; i < 10; i++) { const c = document.createElement('canvas'); c.width = 9; c.height = 8;
+    c.style.width = '18px'; c.style.height = '16px'; el.appendChild(c); lista.push(c); }
+  SERCA[id] = { lista, hp: -1 };
+}
+function rysujSerca(id, hp) {
+  const s = SERCA[id]; hp = Math.round(hp);
+  if (s.hp === hp) return; s.hp = hp;
+  s.lista.forEach((c, i) => { const x = c.getContext('2d'); x.clearRect(0, 0, 9, 8);
+    const typ = hp >= 2 * (i + 1) ? 'serce' : hp === 2 * i + 1 ? 'pol' : 'puste';
+    PIX[typ].forEach((w, j) => [...w].forEach((ch, k) => { if (ch !== '.') { x.fillStyle = PALETA[ch]; x.fillRect(k, j, 1, 1); } })); });
+}
+przygotujSerca('serca-a'); przygotujSerca('serca-b');
+
+// ======================================================================= scenes and TV mode
+const SCENY = ['arena', 'postep', 'mozg'], CZASY = { arena: 45, postep: 30, mozg: 25 };
+let scena = 'arena', tv = true, tStart = performance.now();
+function pokaz(s) {
+  scena = s; tStart = performance.now();
+  SCENY.forEach(n => { $('s-' + n).classList.toggle('akt', n === s); });
+  document.querySelectorAll('.zakladka').forEach(z => { z.classList.toggle('akt', z.dataset.s === s); z.querySelector('i').style.width = '0'; });
+  setTimeout(() => { Object.values(Chart.instances || {}).forEach(c => c.resize()); if (ostMapa) rysujStrefy(ostMapa); }, 60);
+}
+document.querySelectorAll('.zakladka').forEach(z => z.addEventListener('click', () => pokaz(z.dataset.s)));
+function przelaczTv(v) { tv = v; $('c-tv').textContent = tv ? 'TV ▶' : 'TV ❚❚'; tStart = performance.now(); }
+$('c-tv').addEventListener('click', () => przelaczTv(!tv));
+const nastepna = k => pokaz(SCENY[(SCENY.indexOf(scena) + k + SCENY.length) % SCENY.length]);
+addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'GamepadRightShoulder') nastepna(1);
+  else if (e.key === 'ArrowLeft' || e.key === 'GamepadLeftShoulder') nastepna(-1);
+  else if (e.key === '1' || e.key === '2' || e.key === '3') pokaz(SCENY[+e.key - 1]);
+  else if (e.key.toLowerCase() === 't' || e.key === 'GamepadA') przelaczTv(!tv);
+});
+let padPoprz = [];
+(function petlaTv() {
+  const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
+  if (pads[0]) { const b = pads[0].buttons.map(x => x.pressed);
+    if (b[5] && !padPoprz[5]) nastepna(1); if (b[4] && !padPoprz[4]) nastepna(-1); if (b[0] && !padPoprz[0]) przelaczTv(!tv); padPoprz = b; }
+  const uplyw = (performance.now() - tStart) / 1000, dl = CZASY[scena];
+  const pasek = document.querySelector('.zakladka.akt i');
+  if (pasek) pasek.style.width = tv ? Math.min(100, 100 * uplyw / dl) + '%' : '0';
+  if (tv && uplyw > dl) nastepna(1);
+  requestAnimationFrame(petlaTv);
+})();
+
+// ======================================================================= Chart.js
+Chart.defaults.color = K.tekst2;
+Chart.defaults.font.family = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+Chart.defaults.font.size = 11.5;
+Chart.defaults.borderColor = K.siatka;
+Chart.defaults.animation = false;
+Chart.defaults.plugins.tooltip.backgroundColor = '#000d';
+Chart.register({ id: 'poswiata',                     // subtle glow on lines
+  beforeDatasetDraw(ch, a) { const d = ch.data.datasets[a.index]; if (ch.config.type !== 'line' || d.bezPoswiaty) return;
+    ch.ctx.save(); ch.ctx.shadowColor = d.borderColor; ch.ctx.shadowBlur = 10; },
+  afterDatasetDraw(ch, a) { const d = ch.data.datasets[a.index]; if (ch.config.type !== 'line' || d.bezPoswiaty) return; ch.ctx.restore(); } });
+const osX = (t = 'update') => ({ title: { display: false, text: t }, ticks: { maxTicksLimit: 6, color: K.tekst3 }, grid: { display: false } });
+const osY = (proc, opc = {}) => Object.assign({ ticks: { color: K.tekst3, maxTicksLimit: 5, callback: proc ? v => v + '%' : undefined },
+  grid: { color: K.siatka } }, opc);
+function liniowy(id, serie, opcje = {}) {
+  return new Chart($(id), { type: 'line',
+    data: { labels: [], datasets: serie.map(s => Object.assign({ data: [], borderWidth: 2, pointRadius: 0, pointHoverRadius: 4,
+      tension: 0.3, spanGaps: true }, s)) },
+    options: Object.assign({ responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { display: serie.filter(s => !s.ukryj).length > 1, position: 'bottom',
+        labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 18, filter: i => !serie[i.datasetIndex].ukryj } } },
+      scales: { x: osX(), y: osY(false) } }, opcje) });
+}
+const linia50 = { label: '50%', borderColor: '#ffffff40', borderDash: [5, 5], borderWidth: 1, pointHoverRadius: 0, ukryj: true, bezPoswiaty: true };
+const wForma = liniowy('w-forma', [
+  { label: 'vs older versions', borderColor: K.a, backgroundColor: K.a + '1c', fill: 'origin', borderWidth: 3 },
+  { label: 'vs bot v2 (no ping)', borderColor: K.b, backgroundColor: K.b, borderWidth: 3 },
+  linia50,
+  { label: 'raw', borderColor: K.a + '40', borderWidth: 1, ukryj: true, bezPoswiaty: true, pointHoverRadius: 0 },
+  { label: 'raw', borderColor: K.b + '40', borderWidth: 1, ukryj: true, bezPoswiaty: true, pointHoverRadius: 0 }],
+  { scales: { x: osX(), y: osY(true, { min: 0, max: 100 }) },
+    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 18, filter: i => i.datasetIndex < 2 } },
+      tooltip: { filter: i => i.datasetIndex < 2, callbacks: { label: c => c.dataset.label + ': ' + fmt(c.raw, 0) + '%' } } } });
+function wygladz(v, okno = 7) {                          // moving average (skips gaps)
+  return v.map((_, i) => { const w = v.slice(Math.max(0, i - okno + 1), i + 1).filter(x => x != null);
+    return w.length ? w.reduce((a, b) => a + b, 0) / w.length : null; });
+}
+const wEgz = liniowy('w-egz', [
+  { label: 'fists', borderColor: K.a, backgroundColor: K.a, pointRadius: 3.5 },
+  { label: 'progress (vs −500)', borderColor: K.b, backgroundColor: K.b, pointRadius: 3.5 },
+  { label: 'stage gain', borderColor: K.s3, backgroundColor: K.s3, pointRadius: 3.5 },
+  linia50], { scales: { x: osX('version'), y: osY(true, { min: 20, max: 90 }) } });
+const wRundy = new Chart($('w-rundy'), { type: 'bar',
+  data: { labels: [], datasets: [
+    { label: 'knockout', data: [], backgroundColor: K.a, stack: 'r', borderColor: K.karta, borderWidth: { top: 1 } },
+    { label: 'on points', data: [], backgroundColor: K.b, stack: 'r', borderColor: K.karta, borderWidth: { top: 1 } },
+    { label: 'draw', data: [], backgroundColor: K.s3, stack: 'r', borderColor: K.karta, borderWidth: { top: 1 } }] },
+  options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8, font: { size: 10 } } } },
+    scales: { x: Object.assign(osX(), { stacked: true, ticks: { display: false } }), y: osY(true, { stacked: true, min: 0, max: 100 }) } } });
+const wDl = liniowy('w-dl', [{ label: 'seconds', borderColor: K.s3, backgroundColor: K.s3 + '22', fill: 'origin' }],
+  { scales: { x: Object.assign(osX(), { ticks: { display: false } }), y: osY(false, { min: 0 }) }, plugins: { legend: { display: false } } });
+const wSkok = liniowy('w-skok', [{ label: 'jump', borderColor: K.a }, { label: 'sprint', borderColor: K.b }],
+  { scales: { x: Object.assign(osX(), { ticks: { display: false } }), y: osY(true, { min: 0 }) } });
+const wEkw = liniowy('w-ekw', [
+  { label: 'bow hits', borderColor: K.a }, { label: 'shield', borderColor: '#bfe8ff' }, { label: 'food', borderColor: K.zloto },
+  { label: 'fishing rod', borderColor: K.b }, { label: 'blocks /10', borderColor: K.s3 }],
+  { scales: { x: Object.assign(osX(), { ticks: { display: false } }), y: osY(false, { min: 0 }) },
+    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, pointStyle: 'line', boxWidth: 10, font: { size: 9.5 } } } } });
+const wMartwe = liniowy('w-martwe', [{ label: 'block 1', borderColor: K.s3 }, { label: 'block 2', borderColor: K.a }, { label: 'block 3', borderColor: K.b }],
+  { scales: { x: osX('version'), y: osY(true, { min: 0 }) } });
+const wEnt = liniowy('w-ent', [{ label: 'entropy', borderColor: K.zloto, backgroundColor: K.zloto + '18', fill: 'origin' }],
+  { scales: { x: osX(), y: osY(false, { min: 0 }) }, plugins: { legend: { display: false } } });
+const wDystans = new Chart($('w-dystans'), { type: 'bar', data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderRadius: 3 }] },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false },
+      tooltip: { callbacks: { label: c => fmt(c.raw, 1) + '% of the time' } } },
+    scales: { x: Object.assign(osX(), { ticks: { maxTicksLimit: 7, color: K.tekst3 } }), y: osY(true) } } });
+function ustaw(w, et, serie) { w.data.labels = et; serie.forEach((d, i) => { if (w.data.datasets[i]) w.data.datasets[i].data = d; }); w.update('none'); }
+
+// ======================================================================= data from the panel server
+const ETAPY = [['Fists', 0], ['Sword & axe', 3000], ['Armor', 8640], ['Ping', 10065], ['Items', 12150], ['Terrain & 1v3', 21080]];
+async function odswiezLog() {
+  try {
+    const d = await (await fetch('/api/log')).json();
+    if (!d.jest) return;
+    const p = d.punkty, t = d.teraz, akt = p.map(x => x.akt);
+    const pula = p.map(x => x.pula), bot = p.map(x => x.bot);
+    ustaw(wForma, akt, [wygladz(pula), wygladz(bot), p.map(() => 50), pula, bot]);
+    ustaw(wRundy, akt, [p.map(x => x.nokaut), p.map(x => x.punkty), p.map(x => x.remis)]);
+    ustaw(wDl, akt, [p.map(x => x.dl)]);
+    ustaw(wSkok, akt, [p.map(x => x.skok), p.map(x => x.sprint)]);
+    ustaw(wEkw, akt, [p.map(x => x.traf_strzala), p.map(x => x.blokady), p.map(x => x.zjedzone), p.map(x => x.haki),
+                      p.map(x => x.bloki_post == null ? null : x.bloki_post / 10)].map(v => wygladz(v, 5)));
+    ustaw(wEnt, akt, [p.map(x => x.ent)]);
+    $('f-pula').textContent = t.pula == null ? '—' : fmt(t.pula) + '%';
+    $('f-bot').textContent = t.bot == null ? '—' : fmt(t.bot) + '%';
+    $('f-ko').textContent = t.nokaut == null ? '—' : fmt(t.nokaut) + '%';
+    $('c-wersja').textContent = '#' + fmt(t.akt);
+    $('c-kroki').textContent = fmt(t.kroki / 1e6, 1) + ' M';
+    $('mz-ent').textContent = fmt(p[p.length - 1].ent, 2);
+    const swieze = Date.now() / 1000 - t.zmiana < 120;
+    $('c-trening').innerHTML = `<span class="dot ${t.dziala && swieze ? 'ok' : 'zle'}"></span>` +
+      (t.dziala && swieze ? `training <b>${fmt(t.kps / 1000, 1)}k/s</b>` : t.dziala ? 'training: paused' : 'training stopped');
+    const al = t.alarmy || [];
+    $('alarm').style.display = al.length ? 'inline-block' : 'none';
+    $('alarm').innerHTML = al.length ? `<b>WARNING</b>${al[0].tekst}` : '';
+    $('alarm').title = al.map(a => a.tekst).join('\n');
+    // stage road
+    $('droga').innerHTML = ETAPY.map(([n, od], i) => {
+      const teraz = i === ETAPY.length - 1, kl = teraz ? 'teraz' : 'zrob';
+      return (i ? '<span class="linia"></span>' : '') +
+        `<span class="krok ${kl}"><i></i><b>${n}</b>${teraz ? ` from #${od} · now #${fmt(t.akt)}` : ` #${od}`}</span>`;
+    }).join('');
+  } catch (e) { }
+}
+async function odswiezEgzamin() {
+  try {
+    const e = await (await fetch('/api/egzamin')).json();
+    ustaw(wEgz, e.map(x => '#' + x.akt), [e.map(x => x.proc), e.map(x => x.postep_proc ?? null), e.map(x => x.zysk_proc ?? null), e.map(() => 50)]);
+  } catch (err) { }
+}
+const OSIAG = [
+  { klucz: 'plateau', tyt: 'Peak form', pod: 'no longer beats itself from 500 updates ago (3 exams)', ik: 'miecz' },
+  { klucz: 'bot', tyt: 'Bot slayer', pod: 'bot v2 without ping, threshold', ik: 'bot' },
+  { klucz: 'fists exam', tyt: 'Remembers fists', pod: 'does not forget the old school', ik: 'piesc' },
+  { klucz: 'fists stable', tyt: 'Fists master', pod: '3 fists exams within 8 pts', ik: 'korona' },
+  { klucz: 'stage gain', tyt: 'Loadout master', pod: 'with the full loadout beats itself from before the stage', ik: 'luk' },
+  { klucz: 'minimum', tyt: 'Persistence', pod: 'minimum training', ik: 'zegar' },
+];
+(() => { $('osiagniecia').innerHTML = ''; OSIAG.forEach((o, i) => {
+  const el = document.createElement('div'); el.className = 'osiag'; el.id = 'os-' + i;
+  const r = document.createElement('div'); r.className = 'ramka'; r.appendChild(ikona(o.ik, 3));
+  const t = document.createElement('div'); t.innerHTML = `<div class="tyt">${o.tyt}</div><div class="pod" id="os-pod-${i}">${o.pod}</div>`;
+  el.append(r, t); $('osiagniecia').appendChild(el); });
+  $('xp-tor').innerHTML = '<i></i>'.repeat(6); })();
+let poprzednieZdobyte = null;
+async function odswiezStraznika() {
+  try {
+    const d = await (await fetch('/api/straznik')).json();
+    if (!d.jest) return;
+    let ile = 0;
+    OSIAG.forEach((o, i) => {
+      const w = d.warunki.find(x => x.nazwa.includes(o.klucz)); if (!w) return;
+      $('os-' + i).classList.toggle('zdobyte', w.ok); ile += w.ok;
+      if (o.klucz === 'bot') $('os-pod-' + i).textContent = 'bot v2 without ping: ' + w.nazwa.replace(/^.*>=\s*/, '≥ ');
+      if (o.klucz === 'minimum') $('os-pod-' + i).textContent = `${fmt(Math.min(d.akt - d.start, d.min_akt))} / ${fmt(d.min_akt)} updates`;
+    });
+    [...$('xp-tor').children].forEach((c, i) => c.classList.toggle('pelne', i < ile));
+    $('xp-poz').textContent = `${ile}/${OSIAG.length}`;
+    $('xp-tekst').textContent = d.ok ? 'MASTERED!' : `to mastery: ${OSIAG.length - ile}`;
+    if (poprzednieZdobyte != null && ile > poprzednieZdobyte) zdarzenie(`<span class="kryt">ACHIEVEMENT!</span> the network met another mastery condition (${ile}/6)`, 'ko');
+    poprzednieZdobyte = ile;
+  } catch (e) { }
+}
+function kolorSekw(u) { const a = [21, 19, 29], b = [190, 220, 255]; u = Math.max(0, Math.min(1, u));
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * u)).join(',')})`; }
+async function odswiezRentgen() {
+  try {
+    const d = await (await fetch('/api/xray')).json();
+    if (!d.jest) return;
+    rysujStrefy(d.mapa);
+    const suma = d.dystans.reduce((a, b) => a + b, 0) || 1;
+    ustaw(wDystans, d.dystans.map((_, i) => fmt(d.dystans_kraw[i], 1)), [d.dystans.map(v => 100 * v / suma)]);
+    wDystans.data.datasets[0].backgroundColor = d.dystans.map((_, i) => d.dystans_kraw[i] < 3 ? K.a : K.a + '55'); wDystans.update('none');
+    const h = d.historia || [];
+    ustaw(wMartwe, h.map(x => '#' + x.akt), [h.map(x => x['block 1']), h.map(x => x['block 2']), h.map(x => x['block 3'])]);
+    const m = d.martwe || [];
+    const b2 = m.find(x => x.nazwa === 'block 2'), b3 = m.find(x => x.nazwa === 'block 3');
+    if (b2 && b3) $('mz-martwe').textContent = `${fmt(b2.martwe, 1)}% / ${fmt(b3.martwe, 1)}%`;
+  } catch (e) { }
+}
+function bok(boxId) { const b = $(boxId); return Math.max(60, Math.floor(Math.min(b.clientWidth, b.clientHeight))); }
+let ostMapa = null;
+function rysujStrefy(mapa) {
+  ostMapa = mapa;
+  const c = $('strefy'), x = c.getContext('2d'), r = DPR(), B = bok('strefy-box');
+  c.style.width = c.style.height = B + 'px';
+  const W = c.width = B * r, H = c.height = B * r;
+  x.fillStyle = '#0d0c13'; x.fillRect(0, 0, W, H);
+  const n = mapa.length, kom = W / n; let maks = 0; mapa.forEach(w => w.forEach(v => { maks = Math.max(maks, v); }));
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const v = mapa[i][j]; if (!v) continue;
+    x.fillStyle = kolorSekw(Math.log1p(v) / Math.log1p(maks)); x.fillRect(j * kom, H - (i + 1) * kom, kom + .5, kom + .5); }
+  const s = W / 12, sx = W / 2, sy = H / 2;
+  x.strokeStyle = '#ffffffaa'; x.setLineDash([5 * r, 5 * r]); x.lineWidth = 1.5 * r; x.beginPath(); x.arc(sx, sy, 3 * s, 0, 7); x.stroke(); x.setLineDash([]);
+  x.fillStyle = K.zloto; x.beginPath(); x.moveTo(sx, sy - .55 * s); x.lineTo(sx - .35 * s, sy + .35 * s); x.lineTo(sx + .35 * s, sy + .35 * s); x.fill();
+  let razem = 0, przed = 0;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const v = mapa[i][j]; razem += v;
+    const pr = -6 + (i + .5) * 12 / n, bk = -6 + (j + .5) * 12 / n; if (pr > 0 && pr < 3 && Math.abs(bk) < 1.5) przed += v; }
+  if (razem) $('strefy-opis').textContent = `Where the network keeps its opponent (triangle = the network). In front of it within attack reach: ${fmt(100 * przed / razem)}% of the time.`;
+}
+
+// ======================================================================= live arena
+const ROZ = 15, POLE = 540;
+const podloga = (() => {                                   // stone floor and glass walls, once
+  const c = document.createElement('canvas'); c.width = c.height = ROZ * 16; const x = c.getContext('2d');
+  let ziarno = 7; const los = () => (ziarno = (ziarno * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < ROZ; i++) for (let j = 0; j < ROZ; j++) {
+    for (let a = 0; a < 16; a++) for (let b = 0; b < 16; b++) {
+      const v = 108 + Math.floor(los() * 22) - (a === 0 || b === 0 ? 14 : 0);
+      x.fillStyle = `rgb(${v},${v},${v + 4})`; x.fillRect(i * 16 + a, j * 16 + b, 1, 1); } }
+  x.fillStyle = '#00000055'; x.fillRect(0, 0, c.width, c.height);
+  return c; })();
+const PRZ = [null, null], strzalySlad = [[], []];
+const slady = [[], []], efekty = [], ostatnieHp = [], stanRundy = { dmg: [0, 0], bil1: [0, 0], bil2: [0, 0], traf: 0, sumaTraf: 0, czas: 0 };
+function zdarzenie(html, kl = '') {
+  const el = document.createElement('div'); el.className = 'zd ' + kl;
+  el.innerHTML = `<span class="godz">${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span>${html}</span>`;
+  const r = $('relacja'); if (r.firstChild && r.firstChild.textContent.includes('Waiting')) r.innerHTML = '';
+  r.prepend(el); while (r.children.length > 9) r.lastChild.remove();
+}
+const BRON = ['fists', 'sword', 'axe'], NAZ = ['<span class="na">A</span>', '<span class="nb">B</span>'];
+let ostatniaBron = ['', ''];
+const IKONA_KAT = ['piesc', 'miecz', 'siekiera', 'luk', 'jablko', 'stek', 'wedka', 'blok', 'piesc'];
+function ikonyBroni(id, p) {
+  const klucz = [p[12], p[13], p[31] & 4].join(','); if (ostatniaBron[id] === klucz) return; ostatniaBron[id] = klucz;
+  const el = $(id); el.innerHTML = '';
+  el.appendChild(ikona(IKONA_KAT[p[13] ?? (p[12] === 1 ? 1 : p[12] === 2 ? 2 : 0)] || 'piesc', 2));
+  if (p[12] > 0) el.appendChild(ikona('zbroja', 2));
+  if (p[31] & 4) el.appendChild(ikona('tarcza', 2));
+}
+// crit from the damage value: weapon damage (fist 1, sword 7, axe 9), crit ×1.5, full diamond armor
+// (20 pts, toughness 8): damage × (1 − min(20, max(4, 20 − d/4)) / 25); threshold halfway between a normal hit and a crit
+const SILA = [1, 7, 9];
+const poZbroi = (d, zb) => zb ? d * (1 - Math.min(20, Math.max(4, 20 - d / 4)) / 25) : d;
+function czyKrytyk(dmg, bron, zb) {
+  const zwykly = poZbroi(SILA[bron] || 1, zb), kryt = poZbroi(1.5 * (SILA[bron] || 1), zb);
+  return dmg >= (zwykly + kryt) / 2;
+}
+function analizuj(s) {
+  const g = s.gracze;
+  // equipment and ping
+  [0, 1].forEach(i => { const k = i ? 'b' : 'a';
+    ikonyBroni('ik-' + k, g[i]);
+    rysujSerca('serca-' + k, g[i][5]);
+    const at = $('atak-' + k); at.firstChild.style.width = (100 * g[i][6]) + '%'; at.classList.toggle('pelny', g[i][6] > 0.95);
+    const p = s.ping && s.ping[i];
+    $('ping-' + k).textContent = !p ? 'no ping' : (p[0] === 0 && p[1] === 0 ? 'ping 0 ms · local play' :
+      `ping ~${p[0] * 100} ms · sees ${p[1]} tick${p[1] === 1 ? '' : 's'} behind`);
+  });
+  if (s.czasy) $('zegar').textContent = Math.max(0, Math.ceil(60 * (1 - s.czasy[0])));
+  // hits and knockouts (arena 1 = players 0/1, arena 2 = 2/3: network vs bot)
+  for (let i = 0; i < 4; i++) {
+    const hp = g[i][5], prev = ostatnieHp[i]; ostatnieHp[i] = hp;
+    if (prev == null) continue;
+    const ktos = i ^ 1;
+    if (hp < prev - 0.05 && hp > 1.05 && i < 2) {
+      const dmg = prev - hp, kryt = czyKrytyk(dmg, g[ktos][12], g[i][12] > 0);
+      stanRundy.dmg[ktos] += dmg; stanRundy.traf++; stanRundy.sumaTraf += dmg;
+      efekty.push({ x: g[i][0], z: g[i][2], tekst: '−' + fmt(dmg, 1), kryt, t: performance.now(), kol: ktos ? K.b : K.a });
+      if (kryt) zdarzenie(`${NAZ[ktos]} <span class="kryt">CRIT!</span> ${BRON[g[ktos][12]]} −${fmt(dmg, 1)}`, ktos ? 'b' : 'a');
+    }
+    if (hp <= 1.05 && prev > 1.05) {
+      if (i < 2) { stanRundy.bil1[ktos]++; efekty.push({ x: g[i][0], z: g[i][2], tekst: 'K.O.', ko: true, t: performance.now(), kol: K.zloto });
+        zdarzenie(`${NAZ[ktos]} knocks out ${NAZ[i]} (${BRON[g[ktos][12]]} vs ${BRON[g[i][12]]}, ${fmt(60 * (s.czasy ? s.czasy[0] : 0))} s)`, 'ko'); }
+      else stanRundy.bil2[i === 3 ? 0 : 1]++;
+    }
+  }
+  // items (arena 1): counter differences within a round
+  [0, 1].forEach(i => { const p = g[i], st = PRZ[i]; if (p.length < 32) return;
+    if (st && s.czasy && s.czasy[0] >= stanRundy.czas) {
+      if (p[25] < st[25]) zdarzenie(`${NAZ[i]} shoots the bow`, i ? 'b' : 'a');
+      if (p[27] > st[27]) zdarzenie(`${NAZ[i]} <span class="kryt">hits with the bow!</span>`, i ? 'b' : 'a');
+      if (p[28] > st[28]) zdarzenie(`${NAZ[i]} takes a hit on the shield`, i ? 'b' : 'a');
+      if (p[26] < st[26]) zdarzenie(`${NAZ[i]} eats ${p[13] === 4 ? 'a golden apple' : 'a steak'}`, i ? 'b' : 'a');
+      if (p[17] === 2 && st[17] !== 2) zdarzenie(`${NAZ[i]} hooks ${NAZ[i ^ 1]} with the rod`, i ? 'b' : 'a');
+      if (p[29] > st[29] && p[29] % 4 === 1) zdarzenie(`${NAZ[i]} places blocks (${p[29]})`, i ? 'b' : 'a');
+    }
+    PRZ[i] = p.slice(); });
+  if (s.czasy) { if (s.czasy[0] < stanRundy.czas - 0.5 && stanRundy.dmg[0] + stanRundy.dmg[1] > 0 && Math.min(g[0][5], g[1][5]) > 1.05) {
+      const [a, b] = stanRundy.dmg; if (Math.abs(a - b) >= 2) zdarzenie(`Time is up: ${a > b ? NAZ[0] : NAZ[1]} wins on points (${fmt(a, 0)} : ${fmt(b, 0)})`);
+      else zdarzenie('Time is up: draw'); }
+    if (s.czasy[0] < stanRundy.czas) stanRundy.dmg = [0, 0];
+    stanRundy.czas = s.czasy[0]; }
+  $('ko-a').textContent = stanRundy.bil1[0]; $('ko-b').textContent = stanRundy.bil1[1];
+  $('bil-1').textContent = `${stanRundy.bil1[0]} : ${stanRundy.bil1[1]}`;
+  $('bil-2').textContent = `${stanRundy.bil2[0]} : ${stanRundy.bil2[1]}`;
+  if (stanRundy.traf) $('bil-dmg').textContent = fmt(stanRundy.sumaTraf / stanRundy.traf, 2);
+}
+function rysujArene(s) {
+  const c = $('arena'), x = c.getContext('2d'), r = DPR();
+  if (c.width !== POLE * r) { c.width = c.height = POLE * r; }
+  const W = c.width, sk = W / (ROZ + 1), o = sk / 2;
+  x.imageSmoothingEnabled = false;
+  x.fillStyle = '#0b0a10'; x.fillRect(0, 0, W, W);
+  x.drawImage(podloga, o, o, ROZ * sk, ROZ * sk);
+  // glass walls
+  x.strokeStyle = '#bfe8ff55'; x.lineWidth = o; x.strokeRect(o / 2, o / 2, W - o, W - o);
+  x.strokeStyle = '#ffffff30'; x.lineWidth = 1 * r;
+  for (let i = 0; i <= ROZ + 1; i++) { x.strokeRect(i * sk - .5, 0, sk, o); x.strokeRect(i * sk - .5, W - o, sk, o);
+    x.strokeRect(0, i * sk - .5, o, sk); x.strokeRect(W - o, i * sk - .5, o, sk); }
+  const P = (px, pz) => [o + (px + 7.5) * sk, o + (pz + 7.5) * sk];
+  const g = s.gracze;
+  [0, 1].forEach(i => {
+    const p = g[i], kol = i ? K.b : K.a, tr = slady[i], ost = tr[tr.length - 1];
+    if (ost && Math.hypot(ost[0] - p[0], ost[1] - p[2]) > 2.5) tr.length = 0;
+    tr.push([p[0], p[2]]); if (tr.length > 36) tr.shift();
+    tr.forEach(([a, b], k) => { const [px, py] = P(a, b); x.fillStyle = kol + Math.floor(20 + 140 * k / tr.length).toString(16).padStart(2, '0');
+      const w = sk * 0.12; x.fillRect(px - w / 2, py - w / 2, w, w); });
+  });
+  [0, 1].forEach(i => {
+    const p = g[i], kol = i ? K.b : K.a, [px, py] = P(p[0], p[2]), yaw = p[3] * Math.PI / 180, kier = [-Math.sin(yaw), Math.cos(yaw)];
+    // view cone + attack reach
+    x.save(); x.translate(px, py); x.rotate(Math.atan2(kier[1], kier[0]));
+    const gr = x.createRadialGradient(0, 0, 0, 0, 0, 3 * sk); gr.addColorStop(0, kol + '55'); gr.addColorStop(1, kol + '00');
+    x.fillStyle = gr; x.beginPath(); x.moveTo(0, 0); x.arc(0, 0, 3 * sk, -0.45, 0.45); x.closePath(); x.fill();
+    x.restore();
+    // shadow and body (Steve's head from above)
+    const h = 0.6 * sk * (1 + Math.min(1.2, p[1]) * 0.25);
+    x.fillStyle = '#00000066'; x.fillRect(px - 0.3 * sk + 3 * r, py - 0.3 * sk + 3 * r, 0.6 * sk, 0.6 * sk);
+    x.save(); x.translate(px, py); x.rotate(yaw);
+    x.fillStyle = p[7] ? '#ff5a5a' : kol; x.fillRect(-h / 2, -h / 2, h, h);
+    x.fillStyle = '#00000040'; x.fillRect(-h / 2, -h / 2, h, h * 0.25);
+    x.fillStyle = '#ffffffcc'; x.fillRect(-h * 0.32, h * 0.22, h * 0.18, h * 0.16); x.fillRect(h * 0.14, h * 0.22, h * 0.18, h * 0.16);
+    x.lineWidth = 2 * r; x.strokeStyle = '#000000aa'; x.strokeRect(-h / 2, -h / 2, h, h);
+    x.restore();
+    if (p[11]) { x.strokeStyle = '#ffffffcc'; x.lineWidth = 2 * r; x.beginPath(); x.moveTo(px, py);
+      x.lineTo(px + kier[0] * 3 * sk, py + kier[1] * 3 * sk); x.stroke(); }
+    if (p[16]) {                                          // shield raised: an arc in front of the player
+      x.save(); x.translate(px, py); x.rotate(Math.atan2(kier[1], kier[0]));
+      x.strokeStyle = '#bfe8ff'; x.lineWidth = 4 * r; x.shadowColor = '#bfe8ff'; x.shadowBlur = 10 * r;
+      x.beginPath(); x.arc(0, 0, 0.7 * sk, -0.9, 0.9); x.stroke(); x.restore(); }
+    if (p[13] === 3 && p[14]) {                           // drawing the bow: the string tightens over time
+      const nap = Math.min(1, p[15] / 20);
+      x.save(); x.translate(px, py); x.rotate(Math.atan2(kier[1], kier[0]));
+      x.strokeStyle = '#8a5a2a'; x.lineWidth = 3 * r; x.beginPath(); x.arc(0.35 * sk, 0, 0.55 * sk, -1.2, 1.2); x.stroke();
+      x.strokeStyle = nap > 0.95 ? K.zloto : '#eee'; x.lineWidth = 1.5 * r; x.beginPath();
+      x.moveTo(0.35 * sk + Math.cos(-1.2) * 0.55 * sk, Math.sin(-1.2) * 0.55 * sk); x.lineTo(0.35 * sk - nap * 0.45 * sk, 0);
+      x.lineTo(0.35 * sk + Math.cos(1.2) * 0.55 * sk, Math.sin(1.2) * 0.55 * sk); x.stroke(); x.restore(); }
+    if (p[13] >= 4 && p[13] <= 5 && p[14]) {              // eating: crumbs
+      x.fillStyle = '#ffd84a'; for (let q = 0; q < 4; q++) x.fillRect(px + Math.sin(performance.now() / 90 + q) * 0.4 * sk, py - 0.4 * sk - q * 2 * r, 3 * r, 3 * r); }
+    if (p[17] > 0) {                                      // fishing bobber
+      const [bx, by] = P(p[18], p[20]);
+      x.strokeStyle = '#ffffff66'; x.lineWidth = 1 * r; x.beginPath(); x.moveTo(px, py); x.lineTo(bx, by); x.stroke();
+      x.fillStyle = p[17] === 2 ? K.zloto : '#e33'; x.fillRect(bx - 3 * r, by - 3 * r, 6 * r, 6 * r); }
+    const tr2 = strzalySlad[i];                           // arrow in flight with a trail
+    if (p[24]) { tr2.push(P(p[21], p[23])); if (tr2.length > 6) tr2.shift(); } else tr2.length = 0;
+    if (tr2.length > 1) { x.strokeStyle = '#ffffffdd'; x.lineWidth = 2 * r; x.beginPath();
+      tr2.forEach(([a, b], k) => k ? x.lineTo(a, b) : x.moveTo(a, b)); x.stroke();
+      const [ax, ay] = tr2[tr2.length - 1]; x.fillStyle = '#fff'; x.fillRect(ax - 2 * r, ay - 2 * r, 4 * r, 4 * r); }
+    x.font = `600 ${12 * r}px "Pixelify Sans", monospace`; x.textAlign = 'center'; x.fillStyle = '#000a';
+    x.fillText(i ? 'B' : 'A', px + r, py - 0.62 * sk + r); x.fillStyle = '#fff'; x.fillText(i ? 'B' : 'A', px, py - 0.62 * sk);
+  });
+  // effects: damage numbers, crits, knockouts
+  const teraz = performance.now();
+  for (let k = efekty.length - 1; k >= 0; k--) {
+    const e = efekty[k], wiek = (teraz - e.t) / (e.ko ? 1600 : 1000);
+    if (wiek > 1) { efekty.splice(k, 1); continue; }
+    const [px, py] = P(e.x, e.z), y = py - 0.8 * sk - wiek * sk * 1.2;
+    x.globalAlpha = 1 - wiek;
+    if (e.kryt || e.ko) for (let q = 0; q < 10; q++) { const ang = q * 0.628 + e.t, rr = (0.3 + wiek * 1.4) * sk;
+      x.fillStyle = e.ko ? K.zloto : '#fff3b0'; x.fillRect(px + Math.cos(ang) * rr, py + Math.sin(ang) * rr, 3 * r, 3 * r); }
+    x.font = `700 ${(e.ko ? 26 : e.kryt ? 18 : 14) * r}px "Pixelify Sans", monospace`; x.textAlign = 'center';
+    x.fillStyle = '#000'; x.fillText(e.kryt ? 'CRIT ' + e.tekst : e.tekst, px + 2 * r, y + 2 * r);
+    x.fillStyle = e.ko ? K.zloto : e.kryt ? '#fff3b0' : '#ffffff'; x.fillText(e.kryt ? 'CRIT ' + e.tekst : e.tekst, px, y);
+    x.globalAlpha = 1;
+  }
+}
+// the network's keyboard and mouse
+const YAW_PROGI = [-45, -30, -20, -12, -6, -3, -1, 0, 1, 3, 6, 12, 20, 30, 45];
+function zbudujReke(id, kto) {
+  const el = $(id), kol = kto ? K.b : K.a;
+  el.innerHTML = `<h2><span class="kto" style="background:${kol}"></span>Network ${kto ? 'B' : 'A'}'s hands</h2>
+    <p class="opis">Brighter = more likely to press it right now.</p>
+    <div class="klawiatura">
+      <div class="klawisz pusty"></div><div class="klawisz" data-k="w">W<small>forward</small></div><div class="klawisz pusty"></div><div class="klawisz" data-k="lpm">LMB<small>attack</small></div>
+      <div class="klawisz" data-k="a">A<small>left</small></div><div class="klawisz" data-k="s">S<small>back</small></div><div class="klawisz" data-k="d">D<small>right</small></div><div class="klawisz" data-k="shift">⇧<small>sneak</small></div>
+      <div class="klawisz szeroki" data-k="ctrl">CTRL<small>sprint</small></div><div class="klawisz szeroki" data-k="spacja">SPACE<small>jump</small></div>
+      <div class="klawisz szeroki" data-k="ppm">RMB<small>bow · shield · eat</small></div><div class="klawisz szeroki" data-k="slot">1–9<small>switch item</small></div>
+    </div>
+    <div class="mysz"><div><div class="opis">Mouse: horizontal turn</div><canvas class="wachlarz" width="180" height="50" style="width:180px;height:50px"></canvas></div>
+      <div style="text-align:center"><div class="opis">certainty</div><div class="pewnosc" style="font-family:var(--pix);font-size:22px">—</div></div></div>`;
+  el.dataset.kol = kol;
+}
+zbudujReke('reka-a', 0); zbudujReke('reka-b', 1);
+function swiec(el, p, kol) {
+  const a = Math.max(0, Math.min(1, p));
+  el.style.background = `color-mix(in srgb, ${kol} ${Math.round(a * 85)}%, #ffffff0a)`;
+  el.style.color = a > 0.45 ? '#fff' : K.tekst3;
+  el.style.boxShadow = a > 0.6 ? `0 0 ${Math.round(18 * a)}px ${kol}aa` : 'none';
+}
+function rysujReke(id, g) {
+  const el = $(id), kol = el.dataset.kol, ruch = g[0];
+  const P = { w: ruch[6] + ruch[7] + ruch[8], s: ruch[0] + ruch[1] + ruch[2], a: ruch[2] + ruch[5] + ruch[8], d: ruch[0] + ruch[3] + ruch[6],
+    spacja: g[1][1], ctrl: g[2][1], lpm: g[3][1], shift: g[4][1],
+    ppm: g[8] ? g[8][1] : 0, slot: g[7] ? 1 - g[7][0] : 0 };
+  el.querySelectorAll('.klawisz[data-k]').forEach(k => swiec(k, P[k.dataset.k], kol));
+  const c = el.querySelector('.wachlarz'), x = c.getContext('2d'), r = DPR();
+  const W = c.width = 180 * r, H = c.height = 50 * r; x.clearRect(0, 0, W, H);
+  const yaw = g[5], maks = Math.max(...yaw), cx = W / 2, cy = H - 4 * r, R = H - 10 * r;
+  yaw.forEach((p, i) => { const ang = -Math.PI / 2 + YAW_PROGI[i] / 45 * 1.25, dl = R * (0.25 + 0.75 * p / maks);
+    x.strokeStyle = i === 7 ? '#ffffff88' : kol; x.globalAlpha = 0.25 + 0.75 * p / maks; x.lineWidth = 6 * r; x.lineCap = 'round';
+    x.beginPath(); x.moveTo(cx + Math.cos(ang) * 6 * r, cy + Math.sin(ang) * 6 * r); x.lineTo(cx + Math.cos(ang) * dl, cy + Math.sin(ang) * dl); x.stroke(); });
+  x.globalAlpha = 1;
+  const ent = g.reduce((s, gl) => s - gl.reduce((t, p) => t + (p > 0 ? p * Math.log(p) : 0), 0), 0);
+  const maksEnt = g.reduce((s, gl) => s + Math.log(gl.length), 0);
+  el.querySelector('.pewnosc').textContent = fmt(100 * (1 - ent / maksEnt)) + '%';
+}
+function rysujMysli(m) {
+  if (!m) return;
+  rysujReke('reka-a', m.glowy[0]); rysujReke('reka-b', m.glowy[1]);
+  const sz = v => 1 / (1 + Math.exp(-2.2 * v));                // value estimate -> "chance" for the tug of war
+  const a = sz(m.wartosc[0]), b = sz(m.wartosc[1]), u = a / (a + b);
+  $('lina-a').style.width = (100 * u) + '%';
+  $('lv-a').textContent = `A ${fmt(100 * u)}%`; $('lv-b').textContent = `${fmt(100 * (1 - u))}% B`;
+  rysujMozg(m.neurony);
+}
+let mozgMaks = 1; const mozgWygl = new Float32Array(256);
+function rysujMozg(nr) {
+  if (scena !== 'mozg') return;
+  const c = $('mozg'), x = c.getContext('2d'), r = DPR(), B = bok('mozg-box');
+  c.style.width = c.style.height = B + 'px';
+  const W = c.width = B * r, H = c.height = B * r, kom = W / 16;
+  x.fillStyle = '#07060b'; x.fillRect(0, 0, W, H);
+  mozgMaks = Math.max(mozgMaks * 0.995, ...nr);
+  x.globalCompositeOperation = 'lighter';
+  nr.forEach((v, i) => { mozgWygl[i] = mozgWygl[i] * 0.6 + (v / mozgMaks) * 0.4; const u = mozgWygl[i];
+    const cx = (i % 16 + .5) * kom, cy = (Math.floor(i / 16) + .5) * kom;
+    const gr = x.createRadialGradient(cx, cy, 0, cx, cy, kom * (0.5 + u * 0.9));
+    gr.addColorStop(0, `rgba(${Math.round(80 + 175 * u)},${Math.round(140 + 100 * u)},255,${0.15 + 0.85 * u})`); gr.addColorStop(1, 'rgba(57,135,229,0)');
+    x.fillStyle = gr; x.fillRect(cx - kom * 1.4, cy - kom * 1.4, kom * 2.8, kom * 2.8);
+    x.fillStyle = `rgba(255,255,255,${0.08 + 0.8 * u * u})`; x.fillRect(cx - kom * .12, cy - kom * .12, kom * .24, kom * .24); });
+  x.globalCompositeOperation = 'source-over';
+}
+let ostWs = 0;
+function polaczZywo() {
+  const ws = new WebSocket(`ws://${location.hostname}:8771`), el = $('c-zywo');
+  ws.onopen = () => { el.innerHTML = '<span class="dot zywy"></span>live'; };
+  ws.onclose = () => { el.innerHTML = '<span class="dot zle"></span>no show'; setTimeout(polaczZywo, 3000); };
+  ws.onmessage = e => {
+    const s = JSON.parse(e.data); if (s.typ !== 'stan') return;
+    analizuj(s);                                             // every tick: so no hit is missed
+    const t = performance.now(); if (t - ostWs < 50) return; ostWs = t;
+    if (scena === 'arena') rysujArene(s);
+    rysujMysli(s.mysli);
+  };
+}
+
+addEventListener('resize', dopasuj); dopasuj();
+odswiezLog(); odswiezEgzamin(); odswiezRentgen(); odswiezStraznika(); polaczZywo();
+setInterval(odswiezLog, 15000); setInterval(odswiezEgzamin, 60000); setInterval(odswiezRentgen, 30000); setInterval(odswiezStraznika, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+	"schemaVersion": 1,
+	"id": "pvpmost",
+	"version": "${version}",
+	"name": "PvP Most",
+	"description": "Bridge between the server and Python: arenas, fake players, observations and actions every tick.",
+	"environment": "*",
+	"entrypoints": { "main": ["pl.pvp.bridge.PvpBridge"] },
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*",
+		"carpet": "*"
+	}
+}

@@ -1,0 +1,22 @@
+{
+	"schemaVersion": 1,
+	"id": "pvppilot",
+	"version": "${version}",
+	"name": "PvP Pilot",
+	"description": "The PvP network in a real client: an assistant for any server (overlay, R = on/off, V = fight the suggested target), pilot and recording camera.",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"pl.pvp.pilot.Pilot"
+		]
+	},
+	"mixins": [
+		"pvppilot.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.5",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

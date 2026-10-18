@@ -1,0 +1,408 @@
+package org.stepan1411.pvp_bot.bot;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import net.fabricmc.loader.api.FabricLoader;
+import org.stepan1411.pvp_bot.config.WorldConfigHelper;
+
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+public class BotSettings {
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static BotSettings INSTANCE;
+    private static Path configPath;
+    
+
+    private boolean autoEquipArmor = true;
+    private boolean autoEquipWeapon = true;
+    private boolean dropWorseArmor = false;
+    private boolean dropWorseWeapons = false;
+    private double dropDistance = 3.0;
+    private int checkInterval = 20;
+    private boolean combatEnabled = true;
+    private boolean revengeEnabled = true;
+    private boolean autoTargetEnabled = false;
+    private boolean targetPlayers = true;
+    private boolean targetHostileMobs = false;
+    private boolean targetOtherBots = false;
+    private double maxTargetDistance = 64.0;
+    private double meleeRange = 3.5;
+    private double rangedMinRange = 20.0;
+    private double rangedOptimalRange = 40.0;
+    private double rangedMaxRange = 60.0;
+    private double maceRange = 6.0;
+    private int attackCooldown = 10;
+    private double moveSpeed = 1.0;
+    private boolean criticalsEnabled = true;
+    private int criticalFallTicks = 6;
+    private int bowMinDrawTime = 40;
+    private boolean rangedEnabled = true;
+    private boolean maceEnabled = true;
+    private boolean spearEnabled = false;
+    private boolean crystalPvpEnabled = true;
+    private boolean anchorPvpEnabled = true;
+    private double spearRange = 4.5;
+    private double spearChargeRange = 12.0;
+    private boolean autoTotemEnabled = true;
+    private boolean totemPriority = true;
+    private boolean autoEatEnabled = true;
+    private boolean autoShieldEnabled = true;
+    private boolean autoMendEnabled = true;
+    private double mendDurabilityThreshold = 0.25;
+    private double shieldHealthThreshold = 0.5;
+    private boolean shieldBreakEnabled = true;
+    private int shieldHoldTicks = 60;
+    private int shieldRaiseTicks = 12;
+    private boolean preferSword = true;
+    private int minHungerToEat = 14;
+    private boolean autoPotionEnabled = true;
+    private boolean cobwebEnabled = true;
+    private boolean retreatEnabled = true;
+    private double retreatHealthPercent = 0.3;
+    private double criticalHealthPercent = 0.15;
+    private boolean bhopEnabled = true;
+    private boolean idleWanderEnabled = false;
+    private double idleWanderRadius = 10.0;
+    private boolean factionsEnabled = true;
+    private boolean friendlyFireEnabled = false;
+    private int missChance = 0;
+    private int mistakeChance = 0;
+    private int shieldBreakChance = 40;
+    private boolean botsRelogs = true;
+    private boolean useSpecialNames = false;
+    private boolean botLeaveOnDeath = true;
+    private boolean attackInvincible = false;
+    private double aimSpeed = 90.0;
+    private boolean shieldMace = true;
+    private int maxMassSpawn = 1000;
+    private boolean arrowPredictionEnabled = true;
+    private boolean rangedStrafeEnabled = true;
+    private boolean rangedRetreatOnClose = true;
+    private boolean profileLagFix = true;
+    private boolean safeSpawn = true;
+    private boolean clearOnRemove = true;
+    
+    public static final BotSettings DEFAULTS = new BotSettings();
+    
+    private BotSettings() {}
+    
+    public static BotSettings get() {
+        if (INSTANCE == null) {
+            load();
+        }
+        return INSTANCE;
+    }
+    
+    public static void load() {
+        Path configDir = FabricLoader.getInstance().getConfigDir().resolve("pvpbot");
+        try {
+            Files.createDirectories(configDir);
+        } catch (Exception e) {
+
+        }
+        
+        configPath = WorldConfigHelper.getWorldConfigDir().resolve("settings.json");
+        
+        if (Files.exists(configPath)) {
+            try (Reader reader = Files.newBufferedReader(configPath)) {
+                INSTANCE = GSON.fromJson(reader, BotSettings.class);
+                if (INSTANCE == null) {
+                    INSTANCE = new BotSettings();
+                }
+            } catch (Exception e) {
+                INSTANCE = new BotSettings();
+            }
+        } else {
+            INSTANCE = new BotSettings();
+            save();
+        }
+    }
+
+    
+    public static void save() {
+        if (INSTANCE == null || configPath == null) return;
+        
+        try (Writer writer = Files.newBufferedWriter(configPath)) {
+            GSON.toJson(INSTANCE, writer);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+
+    public boolean isAutoEquipArmor() { return autoEquipArmor; }
+    public boolean isAutoEquipWeapon() { return autoEquipWeapon; }
+    public boolean isDropWorseArmor() { return dropWorseArmor; }
+    public boolean isDropWorseWeapons() { return dropWorseWeapons; }
+    public double getDropDistance() { return dropDistance; }
+    public int getCheckInterval() { return checkInterval; }
+    
+    public boolean isCombatEnabled() { return combatEnabled; }
+    public boolean isRevengeEnabled() { return revengeEnabled; }
+    public boolean isAutoTargetEnabled() { return autoTargetEnabled; }
+    public boolean isTargetPlayers() { return targetPlayers; }
+    public boolean isTargetHostileMobs() { return targetHostileMobs; }
+    public boolean isTargetOtherBots() { return targetOtherBots; }
+    public double getMaxTargetDistance() { return maxTargetDistance; }
+    public double getMeleeRange() { return meleeRange; }
+    public double getRangedMinRange() { return rangedMinRange; }
+    public double getRangedOptimalRange() { return rangedOptimalRange; }
+    public double getRangedMaxRange() { return rangedMaxRange; }
+    public double getMaceRange() { return maceRange; }
+    public int getAttackCooldown() { return attackCooldown; }
+    public double getMoveSpeed() { return moveSpeed; }
+    public boolean isCriticalsEnabled() { return criticalsEnabled; }
+    public int getCriticalFallTicks() { return criticalFallTicks; }
+    public int getBowMinDrawTime() { return bowMinDrawTime; }
+    public boolean isRangedEnabled() { return rangedEnabled; }
+    public boolean isMaceEnabled() { return maceEnabled; }
+    public boolean isSpearEnabled() { return spearEnabled; }
+    public boolean isCrystalPvpEnabled() { return crystalPvpEnabled; }
+    public boolean isAnchorPvpEnabled() { return anchorPvpEnabled; }
+    public double getSpearRange() { return spearRange; }
+    public double getSpearChargeRange() { return spearChargeRange; }
+    
+    public boolean isAutoTotemEnabled() { return autoTotemEnabled; }
+    public boolean isTotemPriority() { return totemPriority; }
+    public boolean isAutoEatEnabled() { return autoEatEnabled; }
+    public boolean isAutoShieldEnabled() { return autoShieldEnabled; }
+    public boolean isAutoMendEnabled() { return autoMendEnabled; }
+    public double getMendDurabilityThreshold() { return mendDurabilityThreshold; }
+    public double getShieldHealthThreshold() { return shieldHealthThreshold; }
+    public boolean isShieldBreakEnabled() { return shieldBreakEnabled; }
+    public boolean isPreferSword() { return preferSword; }
+    public int getMinHungerToEat() { return minHungerToEat; }
+    public boolean isAutoPotionEnabled() { return autoPotionEnabled; }
+    public boolean isCobwebEnabled() { return cobwebEnabled; }
+    
+
+    public boolean isRetreatEnabled() { return retreatEnabled; }
+    public double getRetreatHealthPercent() { return retreatHealthPercent; }
+    public double getCriticalHealthPercent() { return criticalHealthPercent; }
+    public boolean isBhopEnabled() { return bhopEnabled; }
+    public boolean isIdleWanderEnabled() { return idleWanderEnabled; }
+    public double getIdleWanderRadius() { return idleWanderRadius; }
+    
+
+    public boolean isFactionsEnabled() { return factionsEnabled; }
+    public boolean isFriendlyFireEnabled() { return friendlyFireEnabled; }
+    public int getMissChance() { return missChance; }
+    public int getMistakeChance() { return mistakeChance; }
+    public int getShieldBreakChance() { return shieldBreakChance; }
+    public int getShieldHoldTicks() { return shieldHoldTicks; }
+    public int getShieldRaiseTicks() { return shieldRaiseTicks; }
+    public boolean isBotsRelogs() { return botsRelogs; }
+    
+
+    public boolean isUseSpecialNames() { return useSpecialNames; }
+    public boolean isBotLeaveOnDeath() { return botLeaveOnDeath; }
+    public boolean isAttackInvincible() { return attackInvincible; }
+    public boolean isShieldMace() { return shieldMace; }
+    public int getMaxMassSpawn() { return maxMassSpawn; }
+    public boolean isArrowPredictionEnabled() { return arrowPredictionEnabled; }
+    public boolean isRangedStrafeEnabled() { return rangedStrafeEnabled; }
+    public boolean isRangedRetreatOnClose() { return rangedRetreatOnClose; }
+    public boolean isProfileLagFix() { return profileLagFix; }
+    public double getAimSpeed() { return aimSpeed; }
+    
+
+    public void setAutoEquipArmor(boolean value) { 
+        this.autoEquipArmor = value; 
+        save();
+    }
+    public void setAutoEquipWeapon(boolean value) { 
+        this.autoEquipWeapon = value; 
+        save();
+    }
+    public void setDropWorseArmor(boolean value) { 
+        this.dropWorseArmor = value; 
+        save();
+    }
+    public void setDropWorseWeapons(boolean value) { 
+        this.dropWorseWeapons = value; 
+        save();
+    }
+    public void setDropDistance(double value) { 
+        this.dropDistance = Math.max(1.0, Math.min(10.0, value)); 
+        save();
+    }
+    public void setCheckInterval(int value) { 
+        this.checkInterval = Math.max(1, Math.min(100, value)); 
+        save();
+    }
+    
+    public void setCombatEnabled(boolean value) { this.combatEnabled = value; save(); }
+    public void setRevengeEnabled(boolean value) { this.revengeEnabled = value; save(); }
+    public void setAutoTargetEnabled(boolean value) { this.autoTargetEnabled = value; save(); }
+    public void setTargetPlayers(boolean value) { this.targetPlayers = value; save(); }
+    public void setTargetHostileMobs(boolean value) { this.targetHostileMobs = value; save(); }
+    public void setTargetOtherBots(boolean value) { this.targetOtherBots = value; save(); }
+    
+    public void setMaxTargetDistance(double value) { 
+        this.maxTargetDistance = Math.max(5.0, Math.min(128.0, value)); 
+        save(); 
+    }
+    public void setMeleeRange(double value) { 
+        this.meleeRange = Math.max(2.0, Math.min(6.0, value)); 
+        save(); 
+    }
+    public void setRangedMinRange(double value) { 
+        this.rangedMinRange = Math.max(3.0, Math.min(20.0, value)); 
+        save(); 
+    }
+    public void setRangedOptimalRange(double value) { 
+        this.rangedOptimalRange = Math.max(10.0, Math.min(50.0, value)); 
+        save(); 
+    }
+    public void setRangedMaxRange(double value) { 
+        this.rangedMaxRange = Math.max(15.0, Math.min(100.0, value)); 
+        save(); 
+    }
+    public void setMaceRange(double value) { 
+        this.maceRange = Math.max(3.0, Math.min(10.0, value)); 
+        save(); 
+    }
+    public void setAttackCooldown(int value) { 
+        this.attackCooldown = Math.max(1, Math.min(40, value)); 
+        save(); 
+    }
+    public void setMoveSpeed(double value) { 
+        this.moveSpeed = Math.max(0.1, Math.min(2.0, value)); 
+        save(); 
+    }
+    public void setCriticalsEnabled(boolean value) { this.criticalsEnabled = value; save(); }
+    public void setCriticalFallTicks(int value) {
+        this.criticalFallTicks = Math.max(1, Math.min(10, value));
+        save();
+    }
+    public void setBowMinDrawTime(int value) { 
+        this.bowMinDrawTime = Math.max(5, Math.min(100, value)); 
+        save(); 
+    }
+    public void setRangedEnabled(boolean value) { this.rangedEnabled = value; save(); }
+    public void setMaceEnabled(boolean value) { this.maceEnabled = value; save(); }
+    public void setSpearEnabled(boolean value) { this.spearEnabled = value; save(); }
+    public void setCrystalPvpEnabled(boolean value) { this.crystalPvpEnabled = value; save(); }
+    public void setAnchorPvpEnabled(boolean value) { this.anchorPvpEnabled = value; save(); }
+    public void setSpearRange(double value) { 
+        this.spearRange = Math.max(2.0, Math.min(8.0, value)); 
+        save(); 
+    }
+    public void setSpearChargeRange(double value) { 
+        this.spearChargeRange = Math.max(5.0, Math.min(20.0, value)); 
+        save(); 
+    }
+    
+    public void setAutoTotemEnabled(boolean value) { this.autoTotemEnabled = value; save(); }
+    public void setTotemPriority(boolean value) { this.totemPriority = value; save(); }
+    public void setAutoEatEnabled(boolean value) { this.autoEatEnabled = value; save(); }
+    public void setAutoShieldEnabled(boolean value) { this.autoShieldEnabled = value; save(); }
+    public void setAutoMendEnabled(boolean value) { this.autoMendEnabled = value; save(); }
+    public void setMendDurabilityThreshold(double value) { 
+        this.mendDurabilityThreshold = Math.max(0.1, Math.min(0.9, value)); 
+        save(); 
+    }
+    public void setShieldHealthThreshold(double value) { 
+        this.shieldHealthThreshold = Math.max(0.1, Math.min(1.0, value)); 
+        save(); 
+    }
+    public void setShieldBreakEnabled(boolean value) { this.shieldBreakEnabled = value; save(); }
+    public void setPreferSword(boolean value) { this.preferSword = value; save(); }
+    public void setMinHungerToEat(int value) { 
+        this.minHungerToEat = Math.max(1, Math.min(20, value)); 
+        save(); 
+    }
+    public void setAutoPotionEnabled(boolean value) { this.autoPotionEnabled = value; save(); }
+    public void setCobwebEnabled(boolean value) { this.cobwebEnabled = value; save(); }
+    
+
+    public void setRetreatEnabled(boolean value) { this.retreatEnabled = value; save(); }
+    public void setRetreatHealthPercent(double value) { 
+        this.retreatHealthPercent = Math.max(0.1, Math.min(0.9, value)); 
+        save(); 
+    }
+    public void setCriticalHealthPercent(double value) { 
+        this.criticalHealthPercent = Math.max(0.05, Math.min(0.5, value)); 
+        save(); 
+    }
+    public void setBhopEnabled(boolean value) { this.bhopEnabled = value; save(); }
+    public void setIdleWanderEnabled(boolean value) { this.idleWanderEnabled = value; save(); }
+    public void setIdleWanderRadius(double value) { 
+        this.idleWanderRadius = Math.max(3.0, Math.min(50.0, value)); 
+        save(); 
+    }
+    
+
+    public void setFactionsEnabled(boolean value) { this.factionsEnabled = value; save(); }
+    public void setFriendlyFireEnabled(boolean value) { this.friendlyFireEnabled = value; save(); }
+    public void setMissChance(int value) { 
+        this.missChance = Math.max(0, Math.min(100, value)); 
+        save(); 
+    }
+    public void setMistakeChance(int value) { 
+        this.mistakeChance = Math.max(0, Math.min(100, value)); 
+        save(); 
+    }
+    public void setShieldBreakChance(int value) { 
+        this.shieldBreakChance = Math.max(0, Math.min(100, value)); 
+        save(); 
+    }
+    public void setShieldHoldTicks(int value) { 
+        this.shieldHoldTicks = Math.max(10, Math.min(200, value)); 
+        save(); 
+    }
+    public void setShieldRaiseTicks(int value) { 
+        this.shieldRaiseTicks = Math.max(2, Math.min(40, value)); 
+        save(); 
+    }
+    public void setBotsRelogs(boolean value) { this.botsRelogs = value; save(); }
+    public void setUseSpecialNames(boolean value) { this.useSpecialNames = value; save(); }
+    public void setBotLeaveOnDeath(boolean value) { this.botLeaveOnDeath = value; save(); }
+    public void setAttackInvincible(boolean value) { this.attackInvincible = value; save(); }
+    public void setAimSpeed(double value) { 
+        this.aimSpeed = Math.max(3.0, Math.min(90.0, value)); 
+        save(); 
+    }
+    
+    public void setShieldMace(boolean value) { 
+        this.shieldMace = value; 
+        save(); 
+    }
+    public void setMaxMassSpawn(int value) { 
+        this.maxMassSpawn = Math.max(50, Math.min(10000, value)); 
+        save(); 
+    }
+    public void setArrowPredictionEnabled(boolean value) {
+        this.arrowPredictionEnabled = value;
+        save();
+    }
+    public void setRangedStrafeEnabled(boolean value) {
+        this.rangedStrafeEnabled = value;
+        save();
+    }
+    public void setRangedRetreatOnClose(boolean value) {
+        this.rangedRetreatOnClose = value;
+        save();
+    }
+    public void setProfileLagFix(boolean value) {
+        this.profileLagFix = value;
+        save();
+    }
+
+    public boolean isSafeSpawn() { return safeSpawn; }
+
+    public void setSafeSpawn(boolean value) {
+        this.safeSpawn = value;
+        save();
+    }
+
+    public boolean isClearOnRemove() { return clearOnRemove; }
+
+    public void setClearOnRemove(boolean value) {
+        this.clearOnRemove = value;
+        save();
+    }
+}

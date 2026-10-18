@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "pvp_bot",
+  "version": "${version}",
+  "name": "PVP Bot (26.3 port for pvpmost)",
+  "description": "Stepan1411/pvp-bot-fabric v0.0.15 ported to MC 26.3: Mojang names, movement through Carpet, without telemetry, HeroBot and the client GUI.",
+  "authors": ["Stepan1411"],
+  "contact": { "sources": "https://github.com/Stepan1411/pvp-bot-fabric" },
+  "license": "Unlicense",
+  "environment": "*",
+  "entrypoints": { "main": ["org.stepan1411.pvp_bot.Pvp_bot"] },
+  "depends": { "fabricloader": ">=0.19.0", "minecraft": "~26.3", "fabric-api": "*", "carpet": "*" }
+}

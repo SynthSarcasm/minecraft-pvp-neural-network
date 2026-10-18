@@ -1,0 +1,51 @@
+# --- OS / editors ---
+.DS_Store
+.claude/
+.idea/
+.vscode/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+
+# --- Java / Gradle (only the wrapper is kept) ---
+.gradle/
+build/
+*.jar
+!**/gradle/wrapper/gradle-wrapper.jar
+
+# --- training data and results (gigabytes; weights are published as a GitHub Release asset) ---
+*.pt
+*.npy
+*.npz
+*.mp4
+*.log
+*.bak
+/training/runs/
+/training/recordings/
+/training/videos/
+/training/client_dumps/
+/training/*.csv
+/training/client_arena_label.txt
+/training/PAUZA
+
+# --- secrets (passwords live in plain files next to the servers / client) ---
+*haslo*.txt
+
+# --- Minecraft servers: worlds, libraries and Mojang/Carpet jars are not ours to redistribute ---
+# only start.sh and a server.properties template (without passwords) are kept
+/server*/*
+!/server*/start.sh
+!/server*/server.properties.template
+
+# --- dev client and the assistant's test server ---
+/pilot/run/
+/pilot/test_server/*
+!/pilot/test_server/start.sh
+!/pilot/test_server/server.properties.template
+!/pilot/test_server/datapack/
+
+# --- third-party code: only our 26.3 port of pvp-bot-fabric is included (with its original license) ---
+/third_party/*
+!/third_party/pvpbot26/
